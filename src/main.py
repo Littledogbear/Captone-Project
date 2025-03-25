@@ -11,7 +11,7 @@ from src.analysis_engine.analyzer import TraceAnalyzer
 from src.analysis_engine.trend_analyzer import TrendAnalyzer
 from src.utils.system_monitor import SystemMonitor
 from src.utils.config import load_config
-from src.ember_integration.ember_analyzer import EmberAnalyzer
+from src.virustotal_integration.virustotal_analyzer import VirusTotalAnalyzer
 from src.knowledge_graph.knowledge_graph_builder import KnowledgeGraphBuilder
 from src.knowledge_graph.technique_identifier import TechniqueIdentifier
 from src.knowledge_graph.graph_visualizer import GraphVisualizer
@@ -46,7 +46,7 @@ app.add_middleware(
 system_monitor = SystemMonitor()
 trace_collector = None
 trace_analyzer = None
-ember_analyzer = None
+virustotal_analyzer = None
 knowledge_graph_builder = None
 technique_identifier = None
 graph_visualizer = None
@@ -60,14 +60,14 @@ alert_dashboard = None
 
 def init_components():
     """Initialize components in background."""
-    global trace_collector, trace_analyzer, ember_analyzer, knowledge_graph_builder
+    global trace_collector, trace_analyzer, virustotal_analyzer, knowledge_graph_builder
     global technique_identifier, graph_visualizer, malware_categorizer, trend_analyzer
     global attribution_engine, real_time_monitor, alert_manager, notification_service
     global alert_dashboard
     try:
         trace_collector = TraceCollector()
         trace_analyzer = TraceAnalyzer()
-        ember_analyzer = EmberAnalyzer()
+        virustotal_analyzer = VirusTotalAnalyzer()
         knowledge_graph_builder = KnowledgeGraphBuilder()
         technique_identifier = TechniqueIdentifier()
         graph_visualizer = GraphVisualizer()
@@ -204,14 +204,14 @@ async def analyze_traces(traces: Dict[str, Any]) -> Dict[str, Any]:
 
 @app.post("/malware/analyze")
 async def analyze_malware(file_path: str) -> Dict[str, Any]:
-    """Analyze a malware sample using EMBER."""
-    if not ember_analyzer:
+    """Analyze a malware sample using VirusTotal."""
+    if not virustotal_analyzer:
         raise HTTPException(
             status_code=503,
-            detail="System initializing - EMBER analyzer not ready"
+            detail="System initializing - VirusTotal analyzer not ready"
         )
     try:
-        analysis = ember_analyzer.analyze_file(file_path)
+        analysis = virustotal_analyzer.analyze_file(file_path)
         return analysis
     except Exception as e:
         logger.error(f"Error analyzing malware: {str(e)}")

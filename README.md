@@ -7,7 +7,7 @@ A comprehensive system for collecting, analyzing, and visualizing cyber attack t
 - **Automated Trace Collection**: Collect system traces including processes, network connections, and system resources
 - **AI-Powered Analysis**: Analyze traces using advanced AI techniques to identify attack patterns
 - **Knowledge Graph Construction**: Build knowledge graphs to visualize attack techniques and their relationships
-- **EMBER Integration**: Leverage the EMBER dataset for malware analysis and categorization
+- **VirusTotal Integration**: Leverage the VirusTotal API for malware analysis and categorization
 - **Attack Technique Identification**: Map observed behaviors to MITRE ATT&CK techniques
 - **Advanced Visualization**: Interactive and static visualization of knowledge graphs and attack patterns
 - **Trend Analysis**: Identify emerging attack technique trends over time
@@ -23,7 +23,7 @@ The system consists of the following main components:
 1. **Trace Collector**: Collects system traces from various sources
 2. **Analysis Engine**: Analyzes traces to identify attack patterns
 3. **Knowledge Graph Builder**: Constructs knowledge graphs from analyzed traces
-4. **EMBER Integration**: Integrates with the EMBER dataset for malware analysis
+4. **VirusTotal Integration**: Integrates with the VirusTotal API for malware analysis
 5. **Visualization Engine**: Provides static and interactive visualizations
 6. **Attribution Engine**: Identifies potential attack origins
 7. **Trend Analyzer**: Analyzes attack technique trends over time
@@ -44,7 +44,7 @@ The system provides a RESTful API with the following main endpoints:
 - `/traces/collect`: Collect system traces
 - `/traces/analyze`: Analyze collected traces
 - `/knowledge/build`: Build a knowledge graph from traces
-- `/malware/analyze`: Analyze a malware sample using EMBER
+- `/malware/analyze`: Analyze a malware sample using VirusTotal
 - `/malware/categorize`: Categorize malware based on extracted features
 - `/trends/analyze`: Analyze trends in attack techniques
 - `/attribution/analyze`: Attribute an attack based on traces
@@ -91,7 +91,7 @@ alerting:
 The system includes several test scripts to verify its functionality:
 
 - `test_trace_collector.py`: Test the trace collector component
-- `test_ember_integration.py`: Test the EMBER integration
+- `test_virustotal_integration.py`: Test the VirusTotal integration
 - `test_knowledge_graph.py`: Test the knowledge graph builder
 - `test_trend_analyzer.py`: Test the trend analyzer
 - `test_attribution.py`: Test the attribution engine

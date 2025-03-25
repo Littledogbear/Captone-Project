@@ -53,7 +53,7 @@ def test_system_status():
     """Test the system status endpoint."""
     try:
         logger.info("Testing system status endpoint...")
-        response = requests.get(f"{BASE_URL}/status")
+        response = requests.get(f"{BASE_URL}/system/status")
         
         logger.info(f"Response status code: {response.status_code}")
         logger.info(f"Response body: {response.json()}")

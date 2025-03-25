@@ -19,7 +19,7 @@ class FileAnalyzer:
         # Try to initialize VirusTotal analyzer
         if self.config.get("virustotal", {}).get("enabled", True):
             try:
-                from src.virustotal_integration.virustotal_analyzer import VirusTotalAnalyzer
+                from virustotal_integration.virustotal_analyzer import VirusTotalAnalyzer
                 
                 self.analyzers["virustotal"] = VirusTotalAnalyzer(
                     api_key=self.config.get("virustotal", {}).get("api_key", ""),

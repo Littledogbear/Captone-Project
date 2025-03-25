@@ -29,14 +29,19 @@ class TraceCollector:
         self.last_analysis_time = datetime.now()
         
         # Initialize platform detector and platform-specific collector
-        self.platform_detector = PlatformDetector()
-        if self.platform_detector.is_windows():
-            self.platform_collector = WindowsTraceCollector()
-        elif self.platform_detector.is_mac():
-            self.platform_collector = MacTraceCollector()
-        else:
-            self.logger.warning("Unsupported platform, some features may not work properly")
+        try:
+            self.platform_detector = PlatformDetector()
+            if self.platform_detector.is_windows():
+                self.platform_collector = WindowsTraceCollector()
+            elif self.platform_detector.is_mac():
+                self.platform_collector = MacTraceCollector()
+            else:
+                self.logger.warning("Unsupported platform, some features may not work properly")
+                self.platform_collector = None
+        except Exception as e:
+            self.logger.error(f"Error initializing platform collector: {str(e)}")
             self.platform_collector = None
+            self.logger.info("Using fallback trace collection methods")
 
         try:
             self.ai_analyzer = AITraceAnalyzer(model_path=model_path)
@@ -61,13 +66,14 @@ class TraceCollector:
             registry_events = self.platform_collector.collect_registry_events()
             system_resources = self.platform_collector.collect_system_resources()
             
+            # Safely get values with defaults if any collection failed
             traces = {
                 'timestamp': current_time.isoformat(),
-                'processes': processes.get('processes', []),
-                'network_connections': network_connections.get('network_connections', []),
-                'file_system_events': file_system_events.get('file_system_events', []),
-                'registry_events': registry_events.get('registry_events', []),
-                'system_resources': system_resources.get('system_resources', {})
+                'processes': processes.get('processes', []) if isinstance(processes, dict) else [],
+                'network_connections': network_connections.get('network_connections', []) if isinstance(network_connections, dict) else [],
+                'file_system_events': file_system_events.get('file_system_events', []) if isinstance(file_system_events, dict) else [],
+                'registry_events': registry_events.get('registry_events', []) if isinstance(registry_events, dict) else [],
+                'system_resources': system_resources.get('system_resources', {}) if isinstance(system_resources, dict) else {}
             }
         else:
             # Fallback to generic collection methods

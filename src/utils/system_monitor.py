@@ -11,10 +11,16 @@ class SystemMonitor:
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status."""
+        cpu_info = self._get_cpu_usage()
+        memory_info = self._get_memory_usage()
+        
+        # Add the specific fields expected by the test
         return {
             'timestamp': datetime.now().isoformat(),
-            'cpu_usage': self._get_cpu_usage(),
-            'memory_usage': self._get_memory_usage(),
+            'cpu_percent': cpu_info['percent'],
+            'memory_percent': memory_info['percent'],
+            'cpu_usage': cpu_info,
+            'memory_usage': memory_info,
             'disk_usage': self._get_disk_usage(),
             'network_usage': self._get_network_usage()
         }

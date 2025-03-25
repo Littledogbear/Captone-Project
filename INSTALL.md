@@ -27,7 +27,7 @@
 3. **Run the tests**:
    ```bash
    python test_trace_collector.py
-   python test_ember_integration.py
+   python test_virustotal_integration.py
    python test_knowledge_graph.py
    python test_trend_analyzer.py
    python test_attribution.py

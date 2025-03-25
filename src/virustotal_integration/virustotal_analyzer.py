@@ -270,3 +270,24 @@ class VirusTotalAnalyzer:
                     
         # Remove duplicates and return
         return list(set(categories))
+        
+    def get_status(self) -> Dict[str, Any]:
+        """Get the status of the VirusTotal analyzer (compatibility method for legacy code)."""
+        return {
+            "is_initialized": True,
+            "initialization_error": None,
+            "api_key": bool(self.api_key)  # Just indicate if we have an API key, not the actual key
+        }
+        
+    def batch_analyze(self, file_paths: List[str]) -> List[Dict[str, Any]]:
+        """Analyze multiple files using VirusTotal (compatibility method for legacy code)."""
+        results = []
+        for file_path in file_paths:
+            results.append(self.analyze_file(file_path))
+        return results
+        
+    def _extract_features(self, file_data: bytes) -> Dict[str, Any]:
+        """Extract features from file data (compatibility method for EmberAnalyzer API)."""
+        # This is a stub for compatibility - we handle feature extraction differently
+        # in VirusTotal integration
+        return {"message": "Feature extraction handled during file analysis"}

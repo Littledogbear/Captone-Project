@@ -19,34 +19,15 @@ class FileAnalyzer:
         # Try to initialize VirusTotal analyzer
         if self.config.get("virustotal", {}).get("enabled", True):
             try:
-                vt_spec = importlib.util.find_spec("src.virustotal_integration.virustotal_analyzer")
-                if vt_spec:
-                    vt_module = importlib.util.module_from_spec(vt_spec)
-                    vt_spec.loader.exec_module(vt_module)
-                    
-                    self.analyzers["virustotal"] = vt_module.VirusTotalAnalyzer(
-                        api_key=self.config.get("virustotal", {}).get("api_key", ""),
-                        cache_dir=self.config.get("virustotal", {}).get("cache_dir", "")
-                    )
-                    self.logger.info("VirusTotal analyzer initialized")
+                from src.virustotal_integration.virustotal_analyzer import VirusTotalAnalyzer
+                
+                self.analyzers["virustotal"] = VirusTotalAnalyzer(
+                    api_key=self.config.get("virustotal", {}).get("api_key", ""),
+                    cache_dir=self.config.get("virustotal", {}).get("cache_dir", "")
+                )
+                self.logger.info("VirusTotal analyzer initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize VirusTotal analyzer: {str(e)}")
-                
-        # Try to initialize EMBER analyzer
-        if self.config.get("ember", {}).get("enabled", True):
-            try:
-                ember_spec = importlib.util.find_spec("src.ember_integration.ember_analyzer")
-                if ember_spec:
-                    ember_module = importlib.util.module_from_spec(ember_spec)
-                    ember_spec.loader.exec_module(ember_module)
-                    
-                    self.analyzers["ember"] = ember_module.EmberAnalyzer(
-                        model_path=self.config.get("ember", {}).get("model_path", ""),
-                        ember_data_path=self.config.get("ember", {}).get("data_path", "")
-                    )
-                    self.logger.info("EMBER analyzer initialized")
-            except Exception as e:
-                self.logger.error(f"Failed to initialize EMBER analyzer: {str(e)}")
                 
     def analyze_file(self, file_path: str, analyzer_name: str = None) -> Dict[str, Any]:
         """Analyze a file using the specified analyzer or all available analyzers."""

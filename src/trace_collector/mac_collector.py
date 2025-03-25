@@ -28,16 +28,36 @@ class MacTraceCollector(BaseTraceCollector):
         """Collect network connections on Mac."""
         try:
             connections = []
-            for conn in psutil.net_connections(kind='inet'):
-                if conn.laddr and conn.raddr:
-                    connections.append({
-                        "local_ip": conn.laddr.ip,
-                        "local_port": conn.laddr.port,
-                        "remote_ip": conn.raddr.ip,
-                        "remote_port": conn.raddr.port,
-                        "status": conn.status,
-                        "pid": conn.pid
-                    })
+            for conn in psutil.net_connections(kind='all'):
+                connection_info = {
+                    "status": conn.status,
+                    "pid": conn.pid
+                }
+                
+                # Safely handle local address
+                if conn.laddr:
+                    try:
+                        connection_info["local_ip"] = conn.laddr.ip
+                        connection_info["local_port"] = conn.laddr.port
+                    except AttributeError:
+                        # Handle case where laddr is not a named tuple
+                        if isinstance(conn.laddr, tuple) and len(conn.laddr) >= 2:
+                            connection_info["local_ip"] = conn.laddr[0]
+                            connection_info["local_port"] = conn.laddr[1]
+                
+                # Safely handle remote address
+                if conn.raddr:
+                    try:
+                        connection_info["remote_ip"] = conn.raddr.ip
+                        connection_info["remote_port"] = conn.raddr.port
+                    except AttributeError:
+                        # Handle case where raddr is not a named tuple
+                        if isinstance(conn.raddr, tuple) and len(conn.raddr) >= 2:
+                            connection_info["remote_ip"] = conn.raddr[0]
+                            connection_info["remote_port"] = conn.raddr[1]
+                
+                connections.append(connection_info)
+                
             return {"network_connections": connections}
         except Exception as e:
             self.logger.error(f"Error collecting network connections: {str(e)}")

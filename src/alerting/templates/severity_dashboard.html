@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Severity Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .summary-box {
+            flex: 1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 0 5px;
+            text-align: center;
+        }
+        .summary-box h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .summary-box .count {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .critical {
+            background-color: #ffebee;
+            color: #b71c1c;
+        }
+        .high {
+            background-color: #fff3e0;
+            color: #e65100;
+        }
+        .medium {
+            background-color: #fffde7;
+            color: #f57f17;
+        }
+        .low {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+        }
+        .info {
+            background-color: #f5f5f5;
+            color: #424242;
+        }
+        .alerts {
+            margin-top: 20px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .alert-icon {
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .alert-content {
+            flex: 1;
+        }
+        .alert-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .alert-description {
+            margin-bottom: 5px;
+        }
+        .alert-timestamp {
+            font-size: 12px;
+            color: #666;
+        }
+        .platform-windows .alert-icon::before {
+            content: "🔒";
+        }
+        .platform-mac .alert-icon::before {
+            content: "🔐";
+        }
+        .chart-container {
+            margin-top: 30px;
+            height: 300px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="platform-{platform}">
+    <div class="dashboard">
+        <h1>Severity Dashboard</h1>
+        
+        <div class="summary">
+            <div class="summary-box critical">
+                <h2>Critical</h2>
+                <div class="count">{critical_count}</div>
+            </div>
+            <div class="summary-box high">
+                <h2>High</h2>
+                <div class="count">{high_count}</div>
+            </div>
+            <div class="summary-box medium">
+                <h2>Medium</h2>
+                <div class="count">{medium_count}</div>
+            </div>
+            <div class="summary-box low">
+                <h2>Low</h2>
+                <div class="count">{low_count}</div>
+            </div>
+            <div class="summary-box info">
+                <h2>Info</h2>
+                <div class="count">{info_count}</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="severityTrendChart"></canvas>
+        </div>
+        
+        <div class="alerts">
+            <h2>Recent Alerts</h2>
+            {alerts_html}
+        </div>
+    </div>
+    
+    <script>
+        // Initialize trend chart
+        const ctx = document.getElementById('severityTrendChart').getContext('2d');
+        const severityTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {trend_labels},
+                datasets: [
+                    {
+                        label: 'Critical',
+                        data: {critical_trend},
+                        borderColor: '#f44336',
+                        backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'High',
+                        data: {high_trend},
+                        borderColor: '#ff9800',
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Medium',
+                        data: {medium_trend},
+                        borderColor: '#ffeb3b',
+                        backgroundColor: 'rgba(255, 235, 59, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Low',
+                        data: {low_trend},
+                        borderColor: '#2196f3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Alerts'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Detect platform
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        document.body.classList.add(isMac ? 'platform-mac' : 'platform-windows');
+    </script>
+</body>
+</html>

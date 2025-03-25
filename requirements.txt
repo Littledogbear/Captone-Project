@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+numpy
+scikit-learn
+matplotlib
+psutil
+transformers
+torch
+lief
+networkx
+pandas
+requests
+pyyaml
+datasets

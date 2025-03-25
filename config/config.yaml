@@ -1,0 +1,89 @@
+# Cyber Attack Tracer Configuration
+
+app:
+  name: "Cyber Attack Tracer"
+  version: "0.1.0"
+  log_level: "INFO"
+  log_dir: "logs"
+
+trace_collector:
+  window_size: 300  # 5 minutes
+  pattern_threshold: 0.7
+  log_dir: "logs/traces"
+
+ai_analyzer:
+  model_path: "distilbert-base-uncased"
+  zero_shot_model: "cross-encoder/nli-distilroberta-base"
+  confidence_threshold: 0.6
+
+ember_integration:
+  model_path: null
+  ember_data_path: null
+
+knowledge_graph:
+  output_dir: "data/graphs"
+
+malware_categorizer:
+  db_path: "data/malware_db"
+
+trend_analyzer:
+  history_file: "data/technique_history.json"
+  default_window: 30  # 30 days
+
+attribution:
+  attribution_db_path: "data/attribution/attribution_db.json"
+  actor_profiles_path: "data/attribution/actor_profiles.json"
+  geolocation_cache_dir: "data/attribution/geolocation_cache"
+  fingerprint_db_path: "data/attribution/tool_fingerprints.json"
+
+real_time_monitor:
+  enabled: true
+  monitoring_interval: 30  # seconds
+  max_history: 100
+  alert_dir: "data/alerts"
+
+alerting:
+  enabled: true
+  alert_dir: "data/alerts"
+  max_history: 1000
+  enabled_handlers: ["console", "file"]
+  console_format: "standard"
+  suspicious_processes: ["mimikatz", "psexec", "netcat", "nc.exe", "powershell.exe -nop -w hidden"]
+  suspicious_ports: [4444, 8080, 9001, 31337]
+  suspicious_extensions: [".exe", ".dll", ".ps1", ".bat", ".vbs"]
+  suspicious_paths: ["temp", "windows\\temp", "appdata\\local\\temp"]
+  suspicious_registry_keys: ["run", "runonce", "winlogon", "userinit", "shell", "startup"]
+  high_cpu_threshold: 90
+  system_cpu_threshold: 95
+  system_memory_threshold: 95
+  technique_confidence_threshold: 0.7
+
+alert_dashboard:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8080
+
+notifications:
+  enabled: false
+  severity_threshold: "MEDIUM"
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    smtp_username: ""
+    smtp_password: ""
+    from_email: ""
+    to_emails: []
+  webhook:
+    enabled: false
+    url: ""
+    headers: {}
+  sms:
+    enabled: false
+    provider: ""
+    api_key: ""
+    from: ""
+    to: []
+  actor_profiles_path: "data/attribution/actor_profiles.json"
+  geolocation_cache_dir: "data/attribution/geolocation_cache"
+  fingerprint_db_path: "data/attribution/tool_fingerprints.json"

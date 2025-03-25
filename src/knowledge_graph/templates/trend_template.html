@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Attack Trend Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        #content {
+            display: flex;
+            flex-grow: 1;
+            padding: 20px;
+            overflow: auto;
+        }
+        #charts {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #sidebar {
+            flex: 1;
+            background-color: white;
+            border-radius: 5px;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-left: 20px;
+            max-width: 300px;
+        }
+        .chart-container {
+            background-color: white;
+            border-radius: 5px;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            height: 300px;
+        }
+        .trend-up {
+            color: #e74c3c;
+        }
+        .trend-down {
+            color: #2ecc71;
+        }
+        .trend-stable {
+            color: #3498db;
+        }
+        .technique-list {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .technique-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .technique-item:hover {
+            background-color: #f9f9f9;
+        }
+        .technique-item.selected {
+            background-color: #e8f4f8;
+            border-left: 3px solid #3498db;
+        }
+        .filter-container {
+            margin-bottom: 20px;
+        }
+        .filter-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .platform-indicator {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .platform-windows {
+            background-color: #0078d7;
+            color: white;
+        }
+        .platform-mac {
+            background-color: #999;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="title">Attack Trend Visualization</div>
+            <div>
+                <button id="export-data">Export Data</button>
+                <button id="export-image">Export Image</button>
+            </div>
+        </div>
+        <div id="content">
+            <div id="charts">
+                <div class="chart-container">
+                    <h3>Technique Frequency Over Time</h3>
+                    <canvas id="trend-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Platform Distribution</h3>
+                    <div style="display: flex; height: 100%;">
+                        <div style="flex: 1;">
+                            <canvas id="platform-chart"></canvas>
+                        </div>
+                        <div style="flex: 1;">
+                            <canvas id="severity-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="sidebar">
+                <div class="filter-container">
+                    <label class="filter-label">Time Period</label>
+                    <select id="time-period">
+                        <option value="7">Last 7 Days</option>
+                        <option value="30" selected>Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="365">Last Year</option>
+                    </select>
+                </div>
+                <div class="filter-container">
+                    <label class="filter-label">Platform</label>
+                    <select id="platform-filter">
+                        <option value="all" selected>All Platforms</option>
+                        <option value="windows">Windows Only</option>
+                        <option value="mac">Mac Only</option>
+                    </select>
+                </div>
+                <div class="filter-container">
+                    <label class="filter-label">Minimum Occurrences</label>
+                    <input type="range" id="min-occurrences" min="1" max="50" value="5">
+                    <div>Value: <span id="min-occurrences-value">5</span></div>
+                </div>
+                <button id="apply-filters">Apply Filters</button>
+                
+                <h3>Top Techniques</h3>
+                <div class="technique-list" id="technique-list">
+                    <!-- Technique items will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Trend data will be inserted here
+        const trendData = {{TREND_DATA}};
+        
+        // Detect platform
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        document.body.classList.add(isMac ? 'platform-mac' : 'platform-windows');
+        
+        // Process data for charts
+        const processChartData = (data, timePeriod = 30, platform = 'all', minOccurrences = 5) => {
+            // Filter data based on time period
+            const filteredData = {
+                techniques: {},
+                time_periods: []
+            };
+            
+            // Get time periods based on selected filter
+            const periods = data.time_periods.slice(-timePeriod);
+            filteredData.time_periods = periods;
+            
+            // Filter techniques
+            for (const [id, technique] of Object.entries(data.techniques)) {
+                // Filter by platform if needed
+                if (platform !== 'all' && technique.platforms && !technique.platforms.includes(platform)) {
+                    continue;
+                }
+                
+                // Filter by minimum occurrences
+                const totalCount = technique.count || 0;
+                if (totalCount < minOccurrences) {
+                    continue;
+                }
+                
+                // Add to filtered data
+                filteredData.techniques[id] = {
+                    ...technique,
+                    periods: technique.periods ? technique.periods.filter(p => periods.includes(p)) : []
+                };
+            }
+            
+            return filteredData;
+        };
+        
+        // Initialize charts
+        const initCharts = (data) => {
+            // Trend chart
+            const trendCtx = document.getElementById('trend-chart').getContext('2d');
+            const trendLabels = data.time_periods;
+            
+            // Prepare datasets
+            const datasets = [];
+            const topTechniques = Object.entries(data.techniques)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 5);
+                
+            const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'];
+            
+            topTechniques.forEach(([id, technique], index) => {
+                const techniqueData = trendLabels.map(period => {
+                    return technique.period_counts && technique.period_counts[period] ? 
+                        technique.period_counts[period] : 0;
+                });
+                
+                datasets.push({
+                    label: `${id}: ${technique.name}`,
+                    data: techniqueData,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '33',
+                    tension: 0.1,
+                    fill: false
+                });
+            });
+            
+            const trendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: trendLabels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Occurrences'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time Period'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Platform distribution chart
+            const platformCtx = document.getElementById('platform-chart').getContext('2d');
+            
+            // Count techniques by platform
+            const platformCounts = {
+                windows: 0,
+                mac: 0,
+                both: 0
+            };
+            
+            for (const technique of Object.values(data.techniques)) {
+                if (technique.platforms) {
+                    if (technique.platforms.includes('windows') && technique.platforms.includes('mac')) {
+                        platformCounts.both += technique.count || 0;
+                    } else if (technique.platforms.includes('windows')) {
+                        platformCounts.windows += technique.count || 0;
+                    } else if (technique.platforms.includes('mac')) {
+                        platformCounts.mac += technique.count || 0;
+                    }
+                }
+            }
+            
+            const platformChart = new Chart(platformCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Windows', 'Mac', 'Both'],
+                    datasets: [{
+                        data: [platformCounts.windows, platformCounts.mac, platformCounts.both],
+                        backgroundColor: ['#0078d7', '#999', '#7b7b7b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Platform Distribution'
+                        }
+                    }
+                }
+            });
+            
+            // Severity distribution chart
+            const severityCtx = document.getElementById('severity-chart').getContext('2d');
+            
+            // Count techniques by severity
+            const severityCounts = {
+                critical: 0,
+                high: 0,
+                medium: 0,
+                low: 0
+            };
+            
+            for (const technique of Object.values(data.techniques)) {
+                if (technique.severity) {
+                    severityCounts[technique.severity.toLowerCase()] += technique.count || 0;
+                }
+            }
+            
+            const severityChart = new Chart(severityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Critical', 'High', 'Medium', 'Low'],
+                    datasets: [{
+                        data: [
+                            severityCounts.critical, 
+                            severityCounts.high, 
+                            severityCounts.medium, 
+                            severityCounts.low
+                        ],
+                        backgroundColor: ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Severity Distribution'
+                        }
+                    }
+                }
+            });
+            
+            return {
+                trendChart,
+                platformChart,
+                severityChart
+            };
+        };
+        
+        // Populate technique list
+        const populateTechniqueList = (data) => {
+            const techniqueList = document.getElementById('technique-list');
+            techniqueList.innerHTML = '';
+            
+            const sortedTechniques = Object.entries(data.techniques)
+                .sort((a, b) => b[1].count - a[1].count);
+                
+            sortedTechniques.forEach(([id, technique]) => {
+                const item = document.createElement('div');
+                item.className = 'technique-item';
+                item.dataset.id = id;
+                
+                // Determine trend icon
+                let trendIcon = '';
+                let trendClass = '';
+                if (technique.trend === 'increasing') {
+                    trendIcon = '↑';
+                    trendClass = 'trend-up';
+                } else if (technique.trend === 'decreasing') {
+                    trendIcon = '↓';
+                    trendClass = 'trend-down';
+                } else {
+                    trendIcon = '→';
+                    trendClass = 'trend-stable';
+                }
+                
+                // Create platform indicators
+                let platformIndicators = '';
+                if (technique.platforms) {
+                    if (technique.platforms.includes('windows')) {
+                        platformIndicators += '<span class="platform-indicator platform-windows">Win</span>';
+                    }
+                    if (technique.platforms.includes('mac')) {
+                        platformIndicators += '<span class="platform-indicator platform-mac">Mac</span>';
+                    }
+                }
+                
+                item.innerHTML = `
+                    <div><strong>${id}</strong>: ${technique.name}</div>
+                    <div>
+                        ${platformIndicators}
+                        Count: ${technique.count || 0} 
+                        <span class="${trendClass}">${trendIcon}</span>
+                    </div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    // Remove selected class from all items
+                    document.querySelectorAll('.technique-item').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    
+                    // Add selected class to clicked item
+                    item.classList.add('selected');
+                    
+                    // Show technique details (could be expanded)
+                    console.log(`Selected technique: ${id}`);
+                });
+                
+                techniqueList.appendChild(item);
+            });
+        };
+        
+        // Initialize with default filters
+        let filteredData = processChartData(trendData);
+        let charts = initCharts(filteredData);
+        populateTechniqueList(filteredData);
+        
+        // Update min occurrences value display
+        document.getElementById('min-occurrences').addEventListener('input', function() {
+            document.getElementById('min-occurrences-value').textContent = this.value;
+        });
+        
+        // Apply filters button
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            const timePeriod = parseInt(document.getElementById('time-period').value);
+            const platform = document.getElementById('platform-filter').value;
+            const minOccurrences = parseInt(document.getElementById('min-occurrences').value);
+            
+            // Destroy existing charts
+            charts.trendChart.destroy();
+            charts.platformChart.destroy();
+            charts.severityChart.destroy();
+            
+            // Process data with new filters
+            filteredData = processChartData(trendData, timePeriod, platform, minOccurrences);
+            
+            // Reinitialize charts and technique list
+            charts = initCharts(filteredData);
+            populateTechniqueList(filteredData);
+        });
+        
+        // Export data button
+        document.getElementById('export-data').addEventListener('click', function() {
+            const dataStr = JSON.stringify(filteredData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'attack_trends.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        });
+        
+        // Export image button
+        document.getElementById('export-image').addEventListener('click', function() {
+            // Get the trend chart canvas
+            const canvas = document.getElementById('trend-chart');
+            
+            // Create a temporary link
+            const link = document.createElement('a');
+            link.download = 'attack_trend_chart.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>

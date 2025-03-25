@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cyber Attack Knowledge Graph</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        #controls {
+            display: flex;
+            gap: 10px;
+        }
+        #graph-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #graph {
+            width: 100%;
+            height: 100%;
+        }
+        #sidebar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-height: calc(100% - 20px);
+            overflow-y: auto;
+        }
+        #node-info {
+            margin-top: 10px;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        .node text {
+            font-size: 10px;
+            fill: #333;
+        }
+        .legend {
+            margin-top: 10px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        select {
+            padding: 5px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="title">Cyber Attack Knowledge Graph</div>
+            <div id="controls">
+                <select id="layout-select">
+                    <option value="force">Force-Directed</option>
+                    <option value="radial">Radial</option>
+                    <option value="tree">Tree</option>
+                    <option value="circle">Circle</option>
+                </select>
+                <button id="zoom-in">Zoom In</button>
+                <button id="zoom-out">Zoom Out</button>
+                <button id="reset-zoom">Reset</button>
+                <button id="toggle-sidebar">Toggle Info</button>
+            </div>
+        </div>
+        <div id="graph-container">
+            <div id="graph"></div>
+            <div id="sidebar">
+                <h3>Graph Information</h3>
+                <div>Nodes: <span id="node-count">0</span></div>
+                <div>Edges: <span id="edge-count">0</span></div>
+                <div>Techniques: <span id="technique-count">0</span></div>
+                <div class="legend">
+                    <h4>Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #AED6F1;"></div>
+                        <div>Process</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #A3E4D7;"></div>
+                        <div>Network</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #F9E79F;"></div>
+                        <div>File</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #F5B7B1;"></div>
+                        <div>Registry</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #D7BDE2;"></div>
+                        <div>Technique</div>
+                    </div>
+                </div>
+                <div id="node-info">
+                    <h4>Select a node to see details</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Graph data will be inserted here
+        const graphData = {{GRAPH_DATA}};
+        
+        // Node color mapping
+        const nodeColors = {
+            'process': '#AED6F1',
+            'network': '#A3E4D7',
+            'file': '#F9E79F',
+            'registry': '#F5B7B1',
+            'technique': '#D7BDE2',
+            'default': '#D3D3D3'
+        };
+        
+        // Update graph statistics
+        document.getElementById('node-count').textContent = graphData.nodes.length;
+        document.getElementById('edge-count').textContent = graphData.links.length;
+        document.getElementById('technique-count').textContent = 
+            graphData.nodes.filter(n => n.type === 'technique').length;
+        
+        // Set up the SVG
+        const width = document.getElementById('graph').clientWidth;
+        const height = document.getElementById('graph').clientHeight;
+        
+        const svg = d3.select('#graph')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', [0, 0, width, height])
+            .call(d3.zoom().on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            }));
+            
+        const g = svg.append('g');
+        
+        // Create the simulation
+        const simulation = d3.forceSimulation(graphData.nodes)
+            .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(100))
+            .force('charge', d3.forceManyBody().strength(-300))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+            
+        // Create the links
+        const link = g.append('g')
+            .selectAll('line')
+            .data(graphData.links)
+            .enter()
+            .append('line')
+            .attr('class', 'link')
+            .attr('stroke-width', 1.5);
+            
+        // Create the nodes
+        const node = g.append('g')
+            .selectAll('.node')
+            .data(graphData.nodes)
+            .enter()
+            .append('g')
+            .attr('class', 'node')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+                
+        // Add circles to nodes
+        node.append('circle')
+            .attr('r', d => d.type === 'technique' ? 12 : 8)
+            .attr('fill', d => nodeColors[d.type] || nodeColors.default);
+            
+        // Add labels to nodes
+        node.append('text')
+            .attr('dx', 12)
+            .attr('dy', '.35em')
+            .text(d => {
+                if (d.type === 'process') return d.name || d.id;
+                if (d.type === 'network') return `${d.ip || ''}:${d.port || ''}`;
+                if (d.type === 'technique') return d.id || '';
+                return d.id;
+            });
+            
+        // Add title for hover
+        node.append('title')
+            .text(d => {
+                if (d.type === 'process') return `${d.name || ''} (PID: ${d.pid || ''})`;
+                if (d.type === 'network') return `${d.ip || ''}:${d.port || ''}`;
+                if (d.type === 'technique') return `${d.id || ''}: ${d.name || ''}`;
+                return d.id;
+            });
+            
+        // Node click handler
+        node.on('click', function(event, d) {
+            // Show node details in sidebar
+            const nodeInfo = document.getElementById('node-info');
+            let html = `<h4>${d.id}</h4><ul>`;
+            
+            for (const [key, value] of Object.entries(d)) {
+                if (key !== 'id' && key !== 'index' && key !== 'x' && key !== 'y' && key !== 'vx' && key !== 'vy') {
+                    html += `<li><strong>${key}:</strong> ${value}</li>`;
+                }
+            }
+            
+            html += '</ul>';
+            nodeInfo.innerHTML = html;
+            
+            // Highlight connected nodes
+            const connectedNodeIds = new Set();
+            graphData.links.forEach(link => {
+                if (link.source.id === d.id) connectedNodeIds.add(link.target.id);
+                if (link.target.id === d.id) connectedNodeIds.add(link.source.id);
+            });
+            
+            node.select('circle')
+                .attr('stroke', n => {
+                    if (n.id === d.id) return '#000';
+                    if (connectedNodeIds.has(n.id)) return '#666';
+                    return 'none';
+                })
+                .attr('stroke-width', n => {
+                    if (n.id === d.id) return 3;
+                    if (connectedNodeIds.has(n.id)) return 2;
+                    return 0;
+                });
+                
+            link.attr('stroke', l => {
+                if (l.source.id === d.id || l.target.id === d.id) return '#666';
+                return '#999';
+            })
+            .attr('stroke-width', l => {
+                if (l.source.id === d.id || l.target.id === d.id) return 2;
+                return 1;
+            });
+        });
+        
+        // Update positions on simulation tick
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+                
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Layout change handler
+        document.getElementById('layout-select').addEventListener('change', function() {
+            const layout = this.value;
+            
+            // Reset forces
+            simulation
+                .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('x', null)
+                .force('y', null);
+                
+            // Apply selected layout
+            if (layout === 'radial') {
+                simulation
+                    .force('x', d3.forceX(width / 2).strength(0.1))
+                    .force('y', d3.forceY(height / 2).strength(0.1))
+                    .force('charge', d3.forceManyBody().strength(-500));
+            } else if (layout === 'tree') {
+                simulation
+                    .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(50).strength(1))
+                    .force('charge', d3.forceManyBody().strength(-1000));
+            } else if (layout === 'circle') {
+                const radius = Math.min(width, height) / 2 - 50;
+                const angleStep = 2 * Math.PI / graphData.nodes.length;
+                
+                graphData.nodes.forEach((node, i) => {
+                    const angle = i * angleStep;
+                    node.x = width / 2 + radius * Math.cos(angle);
+                    node.y = height / 2 + radius * Math.sin(angle);
+                    node.fx = node.x;
+                    node.fy = node.y;
+                });
+                
+                simulation.alpha(0.3).restart();
+                
+                // Release fixed positions after a delay
+                setTimeout(() => {
+                    graphData.nodes.forEach(node => {
+                        node.fx = null;
+                        node.fy = null;
+                    });
+                    simulation.alpha(0.3).restart();
+                }, 2000);
+            }
+            
+            // Restart simulation
+            simulation.alpha(1).restart();
+        });
+        
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', function() {
+            svg.transition().call(
+                d3.zoom().transform,
+                d3.zoomIdentity.translate(width/2, height/2).scale(
+                    d3.zoomTransform(svg.node()).k * 1.5
+                ).translate(-width/2, -height/2)
+            );
+        });
+        
+        document.getElementById('zoom-out').addEventListener('click', function() {
+            svg.transition().call(
+                d3.zoom().transform,
+                d3.zoomIdentity.translate(width/2, height/2).scale(
+                    d3.zoomTransform(svg.node()).k / 1.5
+                ).translate(-width/2, -height/2)
+            );
+        });
+        
+        document.getElementById('reset-zoom').addEventListener('click', function() {
+            svg.transition().call(
+                d3.zoom().transform,
+                d3.zoomIdentity
+            );
+        });
+        
+        // Toggle sidebar
+        document.getElementById('toggle-sidebar').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none';
+        });
+    </script>
+</body>
+</html>

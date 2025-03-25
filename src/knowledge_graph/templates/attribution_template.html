@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Attack Attribution Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        #graph-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #graph {
+            width: 100%;
+            height: 100%;
+        }
+        #sidebar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-height: calc(100% - 20px);
+            overflow-y: auto;
+        }
+        .actor-node {
+            stroke: #ff5722;
+            stroke-width: 2px;
+        }
+        .technique-node {
+            stroke: #9c27b0;
+            stroke-width: 1px;
+        }
+        .confidence-high {
+            stroke-width: 3px;
+        }
+        .confidence-medium {
+            stroke-width: 2px;
+        }
+        .confidence-low {
+            stroke-width: 1px;
+        }
+        .actor-details {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .actor-details h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .technique-list {
+            margin-top: 10px;
+        }
+        .technique-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .confidence-bar {
+            height: 10px;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        .confidence-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="title">Attack Attribution Visualization</div>
+        </div>
+        <div id="graph-container">
+            <div id="graph"></div>
+            <div id="sidebar">
+                <h3>Attribution Analysis</h3>
+                <p>This visualization shows the relationship between threat actors and attack techniques.</p>
+                <div id="actor-info">
+                    <p>Select an actor node to see details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Attribution data will be inserted here
+        const attributionData = {{ATTRIBUTION_DATA}};
+        
+        // Set up the SVG
+        const width = document.getElementById('graph').clientWidth;
+        const height = document.getElementById('graph').clientHeight;
+        
+        const svg = d3.select('#graph')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', [0, 0, width, height])
+            .call(d3.zoom().on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            }));
+            
+        const g = svg.append('g');
+        
+        // Create the simulation
+        const simulation = d3.forceSimulation(attributionData.nodes)
+            .force('link', d3.forceLink(attributionData.links).id(d => d.id).distance(150))
+            .force('charge', d3.forceManyBody().strength(-500))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+            
+        // Create the links
+        const link = g.append('g')
+            .selectAll('line')
+            .data(attributionData.links)
+            .enter()
+            .append('line')
+            .attr('stroke', '#999')
+            .attr('stroke-opacity', 0.6)
+            .attr('stroke-width', d => {
+                const confidence = parseFloat(d.confidence || 0.5);
+                if (confidence > 0.7) return 3;
+                if (confidence > 0.4) return 2;
+                return 1;
+            })
+            .attr('class', d => {
+                const confidence = parseFloat(d.confidence || 0.5);
+                if (confidence > 0.7) return 'confidence-high';
+                if (confidence > 0.4) return 'confidence-medium';
+                return 'confidence-low';
+            });
+            
+        // Create the nodes
+        const node = g.append('g')
+            .selectAll('.node')
+            .data(attributionData.nodes)
+            .enter()
+            .append('g')
+            .attr('class', d => `node ${d.type}-node`)
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+                
+        // Add circles to nodes
+        node.append('circle')
+            .attr('r', d => d.type === 'actor' ? 15 : 10)
+            .attr('fill', d => d.type === 'actor' ? '#EDBB99' : '#D7BDE2');
+            
+        // Add labels to nodes
+        node.append('text')
+            .attr('dx', 15)
+            .attr('dy', '.35em')
+            .text(d => d.name || d.id);
+            
+        // Node click handler
+        node.on('click', function(event, d) {
+            if (d.type === 'actor') {
+                showActorDetails(d);
+            }
+        });
+        
+        // Show actor details
+        function showActorDetails(actor) {
+            const actorInfo = document.getElementById('actor-info');
+            
+            // Get techniques used by this actor
+            const techniques = attributionData.links
+                .filter(link => link.source.id === actor.id || link.source === actor.id)
+                .map(link => {
+                    const target = typeof link.target === 'object' ? link.target : 
+                        attributionData.nodes.find(n => n.id === link.target);
+                    return {
+                        id: target.id,
+                        name: target.name,
+                        confidence: parseFloat(link.confidence || 0.5)
+                    };
+                })
+                .sort((a, b) => b.confidence - a.confidence);
+                
+            let html = `
+                <div class="actor-details">
+                    <h3>${actor.name || actor.id}</h3>
+                    <p><strong>Type:</strong> ${actor.actor_type || 'Unknown'}</p>
+                    <p><strong>First Seen:</strong> ${actor.first_seen || 'Unknown'}</p>
+                    <p><strong>Associated Techniques:</strong> ${techniques.length}</p>
+                    
+                    <div class="technique-list">
+                        <h4>Techniques Used:</h4>
+            `;
+            
+            techniques.forEach(technique => {
+                const confidencePercent = Math.round(technique.confidence * 100);
+                html += `
+                    <div class="technique-item">
+                        <div>${technique.id}: ${technique.name}</div>
+                        <div>${confidencePercent}%</div>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: ${confidencePercent}%"></div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            actorInfo.innerHTML = html;
+            
+            // Highlight connected nodes
+            highlightConnections(actor);
+        }
+        
+        // Highlight connections
+        function highlightConnections(actor) {
+            const connectedNodeIds = new Set();
+            attributionData.links.forEach(link => {
+                if (link.source.id === actor.id || link.source === actor.id) {
+                    connectedNodeIds.add(typeof link.target === 'object' ? link.target.id : link.target);
+                }
+                if (link.target.id === actor.id || link.target === actor.id) {
+                    connectedNodeIds.add(typeof link.source === 'object' ? link.source.id : link.source);
+                }
+            });
+            
+            node.select('circle')
+                .attr('stroke', n => {
+                    if (n.id === actor.id) return '#000';
+                    if (connectedNodeIds.has(n.id)) return '#666';
+                    return 'none';
+                })
+                .attr('stroke-width', n => {
+                    if (n.id === actor.id) return 3;
+                    if (connectedNodeIds.has(n.id)) return 2;
+                    return 0;
+                });
+                
+            link.attr('stroke', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                
+                if (sourceId === actor.id || targetId === actor.id) return '#666';
+                return '#999';
+            })
+            .attr('stroke-opacity', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                
+                if (sourceId === actor.id || targetId === actor.id) return 1;
+                return 0.2;
+            })
+            .attr('stroke-width', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                
+                if (sourceId === actor.id || targetId === actor.id) {
+                    const confidence = parseFloat(l.confidence || 0.5);
+                    if (confidence > 0.7) return 4;
+                    if (confidence > 0.4) return 3;
+                    return 2;
+                }
+                return 1;
+            });
+        }
+        
+        // Update positions on simulation tick
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+                
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+    </script>
+</body>
+</html>

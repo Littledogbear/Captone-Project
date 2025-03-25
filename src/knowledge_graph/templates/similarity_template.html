@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Malware Similarity Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #title {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        #main-content {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        #graph-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #graph {
+            width: 100%;
+            height: 100%;
+        }
+        #sidebar {
+            width: 300px;
+            background-color: white;
+            border-left: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke-opacity: 0.6;
+        }
+        .similarity-high {
+            stroke: #e74c3c;
+            stroke-width: 3px;
+        }
+        .similarity-medium {
+            stroke: #f39c12;
+            stroke-width: 2px;
+        }
+        .similarity-low {
+            stroke: #3498db;
+            stroke-width: 1px;
+        }
+        .malware-critical {
+            stroke: #e74c3c;
+            stroke-width: 2px;
+        }
+        .malware-high {
+            stroke: #e67e22;
+            stroke-width: 2px;
+        }
+        .malware-medium {
+            stroke: #f1c40f;
+            stroke-width: 1px;
+        }
+        .malware-low {
+            stroke: #2ecc71;
+            stroke-width: 1px;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .malware-details {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .malware-details h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .similarity-list {
+            margin-top: 10px;
+        }
+        .similarity-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .similarity-bar {
+            height: 10px;
+            background-color: #ddd;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        .similarity-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+        .filter-container {
+            margin-bottom: 15px;
+        }
+        .filter-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+        select, input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .severity-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: white;
+            margin-right: 5px;
+        }
+        .severity-critical {
+            background-color: #e74c3c;
+        }
+        .severity-high {
+            background-color: #e67e22;
+        }
+        .severity-medium {
+            background-color: #f1c40f;
+            color: #333;
+        }
+        .severity-low {
+            background-color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <div id="title">Malware Similarity Visualization</div>
+            <div>
+                <button id="export-data">Export Data</button>
+            </div>
+        </div>
+        <div id="main-content">
+            <div id="graph-container">
+                <div id="graph"></div>
+                <div id="tooltip" class="tooltip" style="display: none;"></div>
+            </div>
+            <div id="sidebar">
+                <div class="filter-container">
+                    <label class="filter-label">Minimum Similarity</label>
+                    <input type="range" id="similarity-threshold" min="0" max="100" value="50">
+                    <div>Value: <span id="similarity-value">50%</span></div>
+                </div>
+                <div class="filter-container">
+                    <label class="filter-label">Severity Filter</label>
+                    <select id="severity-filter">
+                        <option value="all" selected>All Severities</option>
+                        <option value="critical">Critical Only</option>
+                        <option value="high">High and Above</option>
+                        <option value="medium">Medium and Above</option>
+                    </select>
+                </div>
+                <div class="filter-container">
+                    <label class="filter-label">Family Filter</label>
+                    <select id="family-filter">
+                        <option value="all" selected>All Families</option>
+                        <!-- Family options will be populated dynamically -->
+                    </select>
+                </div>
+                <button id="apply-filters">Apply Filters</button>
+                
+                <div id="malware-info">
+                    <h3>Select a malware node to see details</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Similarity data will be inserted here
+        const similarityData = {{SIMILARITY_DATA}};
+        
+        // Detect platform
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        document.body.classList.add(isMac ? 'platform-mac' : 'platform-windows');
+        
+        // Set up the SVG
+        const width = document.getElementById('graph').clientWidth;
+        const height = document.getElementById('graph').clientHeight;
+        
+        const svg = d3.select('#graph')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', [0, 0, width, height])
+            .call(d3.zoom().on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            }));
+            
+        const g = svg.append('g');
+        
+        // Populate family filter
+        const populateFamilyFilter = () => {
+            const familyFilter = document.getElementById('family-filter');
+            const families = new Set();
+            
+            similarityData.malware.forEach(malware => {
+                if (malware.family) {
+                    families.add(malware.family);
+                }
+            });
+            
+            families.forEach(family => {
+                const option = document.createElement('option');
+                option.value = family;
+                option.textContent = family;
+                familyFilter.appendChild(option);
+            });
+        };
+        
+        populateFamilyFilter();
+        
+        // Filter data based on user selections
+        const filterData = () => {
+            const similarityThreshold = parseInt(document.getElementById('similarity-threshold').value) / 100;
+            const severityFilter = document.getElementById('severity-filter').value;
+            const familyFilter = document.getElementById('family-filter').value;
+            
+            // Filter nodes
+            const filteredNodes = similarityData.malware.filter(malware => {
+                // Filter by severity
+                if (severityFilter !== 'all') {
+                    const severity = malware.severity ? malware.severity.toLowerCase() : '';
+                    if (severityFilter === 'critical' && severity !== 'critical') return false;
+                    if (severityFilter === 'high' && !['critical', 'high'].includes(severity)) return false;
+                    if (severityFilter === 'medium' && !['critical', 'high', 'medium'].includes(severity)) return false;
+                }
+                
+                // Filter by family
+                if (familyFilter !== 'all' && malware.family !== familyFilter) return false;
+                
+                return true;
+            });
+            
+            // Get filtered node IDs
+            const filteredNodeIds = new Set(filteredNodes.map(node => node.id));
+            
+            // Filter links
+            const filteredLinks = similarityData.similarities.filter(link => {
+                // Check if both nodes are in filtered nodes
+                if (!filteredNodeIds.has(link.source) || !filteredNodeIds.has(link.target)) return false;
+                
+                // Check similarity threshold
+                return link.similarity >= similarityThreshold;
+            });
+            
+            return {
+                nodes: filteredNodes,
+                links: filteredLinks
+            };
+        };
+        
+        // Update graph with filtered data
+        const updateGraph = () => {
+            // Clear existing graph
+            g.selectAll('*').remove();
+            
+            // Get filtered data
+            const filteredData = filterData();
+            
+            // Create the simulation
+            const simulation = d3.forceSimulation(filteredData.nodes)
+                .force('link', d3.forceLink(filteredData.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+                
+            // Create the links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(filteredData.links)
+                .enter()
+                .append('line')
+                .attr('stroke', '#999')
+                .attr('class', d => {
+                    const similarity = parseFloat(d.similarity || 0);
+                    if (similarity > 0.7) return 'link similarity-high';
+                    if (similarity > 0.4) return 'link similarity-medium';
+                    return 'link similarity-low';
+                });
+                
+            // Create the nodes
+            const node = g.append('g')
+                .selectAll('.node')
+                .data(filteredData.nodes)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+                    
+            // Add circles to nodes
+            node.append('circle')
+                .attr('r', d => {
+                    const detectionRate = parseFloat(d.detection_rate || 0.5);
+                    return 8 + (detectionRate * 6);
+                })
+                .attr('fill', '#7DCEA0')
+                .attr('class', d => {
+                    const severity = d.severity ? d.severity.toLowerCase() : '';
+                    return `malware-${severity}`;
+                });
+                
+            // Add labels to nodes
+            node.append('text')
+                .attr('dx', 12)
+                .attr('dy', '.35em')
+                .text(d => d.name || d.id);
+                
+            // Node mouseover handler
+            node.on('mouseover', function(event, d) {
+                // Show tooltip
+                d3.select('#tooltip')
+                    .style('display', 'block')
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .html(() => {
+                        const severity = d.severity ? d.severity.toUpperCase() : 'UNKNOWN';
+                        const severityClass = d.severity ? `severity-${d.severity.toLowerCase()}` : '';
+                        
+                        return `
+                            <strong>${d.name || d.id}</strong><br>
+                            Family: ${d.family || 'Unknown'}<br>
+                            Severity: <span class="severity-badge ${severityClass}">${severity}</span><br>
+                            Detection Rate: ${Math.round((d.detection_rate || 0) * 100)}%
+                        `;
+                    });
+            })
+            .on('mouseout', function() {
+                d3.select('#tooltip').style('display', 'none');
+            });
+            
+            // Node click handler
+            node.on('click', function(event, d) {
+                showMalwareDetails(d);
+                highlightConnections(d);
+            });
+            
+            // Update positions on simulation tick
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                    
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Return the simulation for later use
+            return simulation;
+        };
+        
+        // Show malware details
+        const showMalwareDetails = (malware) => {
+            const malwareInfo = document.getElementById('malware-info');
+            
+            // Get similar malware
+            const similarMalware = [];
+            similarityData.similarities.forEach(link => {
+                if (link.source === malware.id || link.source.id === malware.id) {
+                    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                    const target = similarityData.malware.find(m => m.id === targetId);
+                    if (target) {
+                        similarMalware.push({
+                            id: target.id,
+                            name: target.name,
+                            family: target.family,
+                            similarity: link.similarity
+                        });
+                    }
+                } else if (link.target === malware.id || link.target.id === malware.id) {
+                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const source = similarityData.malware.find(m => m.id === sourceId);
+                    if (source) {
+                        similarMalware.push({
+                            id: source.id,
+                            name: source.name,
+                            family: source.family,
+                            similarity: link.similarity
+                        });
+                    }
+                }
+            });
+            
+            // Sort by similarity
+            similarMalware.sort((a, b) => b.similarity - a.similarity);
+            
+            // Create HTML
+            const severity = malware.severity ? malware.severity.toUpperCase() : 'UNKNOWN';
+            const severityClass = malware.severity ? `severity-${malware.severity.toLowerCase()}` : '';
+            
+            let html = `
+                <div class="malware-details">
+                    <h3>${malware.name || malware.id}</h3>
+                    <p><strong>Family:</strong> ${malware.family || 'Unknown'}</p>
+                    <p><strong>Severity:</strong> <span class="severity-badge ${severityClass}">${severity}</span></p>
+                    <p><strong>Detection Rate:</strong> ${Math.round((malware.detection_rate || 0) * 100)}%</p>
+                    <p><strong>First Seen:</strong> ${malware.first_seen || 'Unknown'}</p>
+                    
+                    <div class="similarity-list">
+                        <h4>Similar Malware:</h4>
+            `;
+            
+            if (similarMalware.length === 0) {
+                html += '<p>No similar malware found.</p>';
+            } else {
+                similarMalware.forEach(similar => {
+                    const similarityPercent = Math.round(similar.similarity * 100);
+                    html += `
+                        <div class="similarity-item">
+                            <div>${similar.name || similar.id}</div>
+                            <div>${similarityPercent}%</div>
+                        </div>
+                        <div class="similarity-bar">
+                            <div class="similarity-fill" style="width: ${similarityPercent}%"></div>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            malwareInfo.innerHTML = html;
+        };
+        
+        // Highlight connections
+        const highlightConnections = (malware) => {
+            const links = d3.selectAll('line');
+            const nodes = d3.selectAll('.node circle');
+            
+            // Reset all
+            links.attr('stroke-opacity', 0.2).attr('stroke-width', 1);
+            nodes.attr('stroke', 'none').attr('stroke-width', 0);
+            
+            // Highlight selected node
+            d3.select(event.currentTarget).select('circle')
+                .attr('stroke', '#000')
+                .attr('stroke-width', 2);
+            
+            // Highlight connected links and nodes
+            links.each(function(d) {
+                if (d.source.id === malware.id || d.target.id === malware.id) {
+                    d3.select(this)
+                        .attr('stroke-opacity', 1)
+                        .attr('stroke-width', function() {
+                            return parseFloat(d3.select(this).attr('stroke-width')) + 1;
+                        });
+                        
+                    // Highlight connected node
+                    const connectedId = d.source.id === malware.id ? d.target.id : d.source.id;
+                    nodes.each(function(n) {
+                        if (n.id === connectedId) {
+                            d3.select(this)
+                                .attr('stroke', '#666')
+                                .attr('stroke-width', 1);
+                        }
+                    });
+                }
+            });
+        };
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Initialize graph
+        let simulation = updateGraph();
+        
+        // Update similarity threshold value display
+        document.getElementById('similarity-threshold').addEventListener('input', function() {
+            document.getElementById('similarity-value').textContent = this.value + '%';
+        });
+        
+        // Apply filters button
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            // Stop old simulation
+            simulation.stop();
+            
+            // Update graph with new filters
+            simulation = updateGraph();
+        });
+        
+        // Export data button
+        document.getElementById('export-data').addEventListener('click', function() {
+            const filteredData = filterData();
+            const dataStr = JSON.stringify(filteredData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'malware_similarity.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        });
+    </script>
+</body>
+</html>

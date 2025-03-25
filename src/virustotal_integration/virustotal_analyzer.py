@@ -25,6 +25,13 @@ class VirusTotalAnalyzer:
     def analyze_file(self, file_path: str) -> Dict[str, Any]:
         """Analyze a file using VirusTotal."""
         try:
+            # Validate file path
+            if not file_path or not isinstance(file_path, str):
+                return {"error": "Invalid file path provided"}
+                
+            if not os.path.exists(file_path):
+                return {"error": f"File not found: {file_path}"}
+                
             # Calculate file hash
             file_hash = self._calculate_file_hash(file_path)
             if not file_hash:
@@ -171,17 +178,42 @@ class VirusTotalAnalyzer:
     def _process_vt_response(self, vt_response: Dict[str, Any]) -> Dict[str, Any]:
         """Process VirusTotal API response."""
         try:
+            # Validate vt_response is a dictionary
+            if not isinstance(vt_response, dict):
+                self.logger.error(f"Invalid vt_response type: {type(vt_response)}")
+                return {"error": f"Invalid response type: {type(vt_response)}"}
+                
             if "error" in vt_response:
                 return vt_response
                 
-            attributes = vt_response.get("data", {}).get("attributes", {})
+            # Safely get attributes
+            data = vt_response.get("data", {})
+            if not isinstance(data, dict):
+                data = {}
+                
+            attributes = data.get("attributes", {})
+            if not isinstance(attributes, dict):
+                attributes = {}
+                
             stats = attributes.get("stats", {})
+            if not isinstance(stats, dict):
+                stats = {}
             
             # Calculate detection ratio
             malicious = stats.get("malicious", 0)
             suspicious = stats.get("suspicious", 0)
-            total = sum(stats.values())
-            detection_ratio = (malicious + suspicious) / total if total > 0 else 0
+            
+            # Ensure values are numeric
+            try:
+                malicious = int(malicious)
+                suspicious = int(suspicious)
+                total = sum(stats.values())
+                detection_ratio = (malicious + suspicious) / total if total > 0 else 0
+            except (ValueError, TypeError):
+                malicious = 0
+                suspicious = 0
+                total = 0
+                detection_ratio = 0
             
             # Determine severity
             severity = self._calculate_severity(detection_ratio)
@@ -190,7 +222,7 @@ class VirusTotalAnalyzer:
             threat_category = self._determine_threat_category(attributes)
             
             result = {
-                "scan_id": vt_response.get("data", {}).get("id", ""),
+                "scan_id": str(data.get("id", "")),
                 "scan_date": attributes.get("last_analysis_date", ""),
                 "stats": stats,
                 "detection_ratio": detection_ratio,
@@ -201,9 +233,9 @@ class VirusTotalAnalyzer:
                 "md5": attributes.get("md5", ""),
                 "sha1": attributes.get("sha1", ""),
                 "sha256": attributes.get("sha256", ""),
-                "tags": attributes.get("tags", []),
-                "names": attributes.get("names", []),
-                "last_analysis_results": attributes.get("last_analysis_results", {})
+                "tags": attributes.get("tags", []) if isinstance(attributes.get("tags"), list) else [],
+                "names": attributes.get("names", []) if isinstance(attributes.get("names"), list) else [],
+                "last_analysis_results": attributes.get("last_analysis_results", {}) if isinstance(attributes.get("last_analysis_results"), dict) else {}
             }
             
             return result
@@ -228,48 +260,59 @@ class VirusTotalAnalyzer:
         """Determine threat category based on VirusTotal data."""
         categories = []
         
+        # Validate attributes is a dictionary
+        if not isinstance(attributes, dict):
+            self.logger.error(f"Invalid attributes type: {type(attributes)}")
+            return ["Unknown"]
+        
         # Check popular threat names
-        popular_threat_names = attributes.get("popular_threat_classification", {}).get("suggested_threat_label", "")
-        if popular_threat_names:
-            categories.append(popular_threat_names)
+        popular_threat_classification = attributes.get("popular_threat_classification", {})
+        if isinstance(popular_threat_classification, dict):
+            popular_threat_names = popular_threat_classification.get("suggested_threat_label", "")
+            if popular_threat_names:
+                categories.append(popular_threat_names)
             
         # Check sandbox verdicts
         sandbox_verdicts = attributes.get("sandbox_verdicts", {})
-        for verdict in sandbox_verdicts.values():
-            if verdict.get("category") and verdict.get("category") not in categories:
-                categories.append(verdict.get("category"))
+        if isinstance(sandbox_verdicts, dict):
+            for verdict in sandbox_verdicts.values():
+                if isinstance(verdict, dict) and verdict.get("category") and verdict.get("category") not in categories:
+                    categories.append(verdict.get("category"))
                 
         # Check tags
         tags = attributes.get("tags", [])
-        for tag in tags:
-            if any(keyword in tag.lower() for keyword in ["trojan", "ransomware", "backdoor", "worm", "spyware", "adware"]):
-                categories.append(tag)
+        if isinstance(tags, list):
+            for tag in tags:
+                if isinstance(tag, str) and any(keyword in tag.lower() for keyword in ["trojan", "ransomware", "backdoor", "worm", "spyware", "adware"]):
+                    categories.append(tag)
                 
         # If no categories found, check AV labels
         if not categories:
             av_labels = []
             last_analysis_results = attributes.get("last_analysis_results", {})
-            for av_result in last_analysis_results.values():
-                if av_result.get("category") == "malicious" and av_result.get("result"):
-                    av_labels.append(av_result.get("result").lower())
+            if isinstance(last_analysis_results, dict):
+                for av_result in last_analysis_results.values():
+                    if isinstance(av_result, dict) and av_result.get("category") == "malicious" and av_result.get("result"):
+                        av_labels.append(av_result.get("result").lower())
                     
-            # Extract common malware types from AV labels
-            for label in av_labels:
-                if "trojan" in label:
-                    categories.append("Trojan")
-                elif "ransomware" in label:
-                    categories.append("Ransomware")
-                elif "backdoor" in label:
-                    categories.append("Backdoor")
-                elif "worm" in label:
-                    categories.append("Worm")
-                elif "spyware" in label:
-                    categories.append("Spyware")
-                elif "adware" in label:
-                    categories.append("Adware")
+                # Extract common malware types from AV labels
+                for label in av_labels:
+                    if isinstance(label, str):
+                        if "trojan" in label:
+                            categories.append("Trojan")
+                        elif "ransomware" in label:
+                            categories.append("Ransomware")
+                        elif "backdoor" in label:
+                            categories.append("Backdoor")
+                        elif "worm" in label:
+                            categories.append("Worm")
+                        elif "spyware" in label:
+                            categories.append("Spyware")
+                        elif "adware" in label:
+                            categories.append("Adware")
                     
         # Remove duplicates and return
-        return list(set(categories))
+        return list(set(categories)) if categories else ["Unknown"]
         
     def get_status(self) -> Dict[str, Any]:
         """Get the status of the VirusTotal analyzer (compatibility method for legacy code)."""

@@ -92,21 +92,25 @@ async def startup_event():
         
         # Start component initialization in background
         import threading
-        threading.Thread(target=init_components, daemon=True).start()
+        init_thread = threading.Thread(target=init_components, daemon=True)
+        init_thread.start()
         
         # Start real-time monitoring if enabled
         config = load_config()
         if config.get("real_time_monitor", {}).get("enabled", False):
             # We'll start monitoring after components are initialized
-            threading.Thread(target=lambda: _start_monitoring_when_ready(), daemon=True).start()
+            monitor_thread = threading.Thread(target=lambda: _start_monitoring_when_ready(), daemon=True)
+            monitor_thread.start()
             logger.info("Real-time monitoring will start when components are ready")
         
         # Start alert dashboard if enabled
         if config.get("alert_dashboard", {}).get("enabled", False):
             # We'll start dashboard after components are initialized
-            threading.Thread(target=lambda: _start_dashboard_when_ready(), daemon=True).start()
+            dashboard_thread = threading.Thread(target=lambda: _start_dashboard_when_ready(), daemon=True)
+            dashboard_thread.start()
             logger.info("Alert dashboard will start when components are ready")
         
+        logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error in startup: {str(e)}")
         raise
@@ -162,10 +166,10 @@ async def get_system_status() -> Dict[str, Any]:
     """Get current system status."""
     try:
         status = system_monitor.get_system_status()
-        if trace_collector and trace_collector.ai_analyzer:
+        if trace_collector and hasattr(trace_collector, 'ai_analyzer') and trace_collector.ai_analyzer:
             status["ai_status"] = {
-                "initialized": trace_collector.ai_analyzer.is_initialized,
-                "error": trace_collector.ai_analyzer.initialization_error
+                "initialized": getattr(trace_collector.ai_analyzer, 'is_initialized', False),
+                "error": getattr(trace_collector.ai_analyzer, 'initialization_error', None)
             }
         return status
     except Exception as e:
@@ -197,6 +201,9 @@ async def analyze_traces(traces: Dict[str, Any]) -> Dict[str, Any]:
         )
     try:
         analysis = trace_analyzer.analyze_traces(traces)
+        # Add analysis_id to match test expectations
+        import uuid
+        analysis["analysis_id"] = str(uuid.uuid4())
         return analysis
     except Exception as e:
         logger.error(f"Error analyzing traces: {str(e)}")

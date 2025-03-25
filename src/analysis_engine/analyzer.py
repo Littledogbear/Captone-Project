@@ -44,13 +44,31 @@ class TraceAnalyzer:
     
     def _extract_features(self, traces: Dict[str, Any]) -> np.ndarray:
         """Extract numerical features from traces for anomaly detection."""
-        features = [
-            traces['system_resources']['cpu_percent'],
-            traces['system_resources']['memory']['percent'],
-            len(traces['network_connections']),
-            len(traces['processes'])
-        ]
-        return np.array(features).reshape(1, -1)
+        try:
+            # Safely extract features with defaults if keys are missing
+            system_resources = traces.get('system_resources', {})
+            cpu_percent = system_resources.get('cpu_percent', 0)
+            
+            memory = system_resources.get('memory', {})
+            if isinstance(memory, dict):
+                memory_percent = memory.get('percent', 0)
+            else:
+                memory_percent = 0
+                
+            network_connections = traces.get('network_connections', [])
+            processes = traces.get('processes', [])
+            
+            features = [
+                cpu_percent,
+                memory_percent,
+                len(network_connections),
+                len(processes)
+            ]
+            return np.array(features).reshape(1, -1)
+        except Exception as e:
+            self.logger.error(f"Error extracting features: {str(e)}")
+            # Return default features if extraction fails
+            return np.array([0, 0, 0, 0]).reshape(1, -1)
     
     def _assess_risk(self, traces: Dict[str, Any]) -> Dict[str, Any]:
         """Assess the risk level based on system traces."""
@@ -84,9 +102,18 @@ class TraceAnalyzer:
     
     def _check_resource_usage(self, traces: Dict[str, Any]) -> Dict[str, Any]:
         """Check for unusual resource usage patterns."""
+        system_resources = traces.get('system_resources', {})
+        cpu_percent = system_resources.get('cpu_percent', 0)
+        
+        memory = system_resources.get('memory', {})
+        if isinstance(memory, dict):
+            memory_percent = memory.get('percent', 0)
+        else:
+            memory_percent = 0
+            
         return {
-            'high_cpu': traces['system_resources']['cpu_percent'] > 90,
-            'high_memory': traces['system_resources']['memory']['percent'] > 90
+            'high_cpu': cpu_percent > 90,
+            'high_memory': memory_percent > 90
         }
     
     def _calculate_risk_level(self, risk_factors: Dict[str, Any]) -> str:
@@ -111,10 +138,20 @@ class TraceAnalyzer:
         """Generate security recommendations based on analysis."""
         recommendations = []
         
+        # Safely extract system resources with defaults
+        system_resources = traces.get('system_resources', {})
+        cpu_percent = system_resources.get('cpu_percent', 0)
+        
+        memory = system_resources.get('memory', {})
+        if isinstance(memory, dict):
+            memory_percent = memory.get('percent', 0)
+        else:
+            memory_percent = 0
+        
         # Add basic recommendations
-        if traces['system_resources']['cpu_percent'] > 90:
+        if cpu_percent > 90:
             recommendations.append("Investigate processes causing high CPU usage")
-        if traces['system_resources']['memory']['percent'] > 90:
+        if memory_percent > 90:
             recommendations.append("Monitor memory usage and potential memory leaks")
         
         return recommendations

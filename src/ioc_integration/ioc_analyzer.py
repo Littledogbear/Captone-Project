@@ -84,7 +84,7 @@ class IOCAnalyzer:
         filtered_ips = [ip for ip in ips if all(0 <= int(octet) <= 255 for octet in ip.split('.'))]
         iocs["ips"] = filtered_ips
         
-        url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+'
+        url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+(?:/[-\w./%?=&+#]*)?'
         iocs["urls"] = re.findall(url_pattern, text)
         
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'

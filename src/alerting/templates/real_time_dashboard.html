@@ -244,6 +244,60 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Knowledge Graph Styling */
+        .graph-legend {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+        .technique-list {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: inline-block;
+            vertical-align: top;
+        }
+        .technique-list ul {
+            padding-left: 20px;
+        }
+        .technique-list li {
+            margin-bottom: 8px;
+        }
+        
+        /* Report Download Button */
+        .download-button {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .download-button:hover {
+            background-color: #1976D2;
+        }
     </style>
 </head>
 <body>
@@ -478,51 +532,88 @@
                 // Hide loading spinner
                 loadingElement.style.display = 'none';
                 
-                // Display knowledge graph
-                graphContainer.innerHTML = `
-                    <h2>Knowledge Graph Generated</h2>
-                    <p>The knowledge graph has been generated successfully.</p>
-                    <div style="margin: 20px auto; width: 80%; height: 400px; background-color: #f9f9f9; border: 1px solid #ddd; overflow: hidden;">
-                        <svg width="100%" height="100%" viewBox="0 0 800 400">
-                            <!-- Process nodes -->
-                            <circle cx="400" cy="100" r="30" fill="#ff7043" />
-                            <text x="400" y="100" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="bold">malware.exe</text>
-                            
-                            <circle cx="250" cy="200" r="25" fill="#ff7043" />
-                            <text x="250" y="200" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="bold">cmd.exe</text>
-                            
-                            <!-- Network nodes -->
-                            <circle cx="550" cy="200" r="25" fill="#42a5f5" />
-                            <text x="550" y="200" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="bold">C2 Server</text>
-                            
-                            <!-- File nodes -->
-                            <rect x="250" y="300" width="150" height="40" rx="5" fill="#66bb6a" />
-                            <text x="325" y="320" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="bold">important.docx</text>
-                            
-                            <!-- Registry nodes -->
-                            <rect x="450" y="300" width="150" height="40" rx="5" fill="#ab47bc" />
-                            <text x="525" y="320" text-anchor="middle" dominant-baseline="middle" fill="white" font-weight="bold">HKCU\\Run</text>
-                            
-                            <!-- Edges -->
-                            <line x1="400" y1="100" x2="250" y2="200" stroke="#333" stroke-width="2" />
-                            <line x1="400" y1="100" x2="550" y2="200" stroke="#333" stroke-width="2" />
-                            <line x1="400" y1="100" x2="325" y2="300" stroke="#333" stroke-width="2" />
-                            <line x1="400" y1="100" x2="525" y2="300" stroke="#333" stroke-width="2" />
-                            
-                            <!-- Edge labels -->
-                            <text x="325" y="150" text-anchor="middle" fill="#333" font-size="12">spawns</text>
-                            <text x="475" y="150" text-anchor="middle" fill="#333" font-size="12">connects to</text>
-                            <text x="362" y="200" text-anchor="middle" fill="#333" font-size="12">encrypts</text>
-                            <text x="462" y="200" text-anchor="middle" fill="#333" font-size="12">modifies</text>
-                        </svg>
-                    </div>
-                    <p>Detected attack techniques:</p>
-                    <ul style="text-align: left; width: 80%; margin: 0 auto;">
-                        <li><strong>T1071: Command and Control</strong> (Confidence: 80%)</li>
-                        <li><strong>T1547: Boot or Logon Autostart Execution</strong> (Confidence: 75%)</li>
-                        <li><strong>T1486: Data Encrypted for Impact</strong> (Confidence: 90%)</li>
-                    </ul>
-                `;
+                // Load Vis.js for interactive graph
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js';
+                script.onload = function() {
+                    graphContainer.innerHTML = `
+                        <div id="interactive-graph" style="width: 100%; height: 500px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+                        <div class="graph-legend">
+                            <h3>Graph Legend</h3>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #FF5733;"></span>Process</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #33FF57;"></span>File</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #3357FF;"></span>Network Connection</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #FF33F5;"></span>Registry Key</div>
+                        </div>
+                        <div class="technique-list">
+                            <h3>Detected Attack Techniques:</h3>
+                            <ul>
+                                <li><strong>T1071: Command and Control</strong> (Confidence: 80%)</li>
+                                <li><strong>T1547: Boot or Logon Autostart Execution</strong> (Confidence: 75%)</li>
+                                <li><strong>T1486: Data Encrypted for Impact</strong> (Confidence: 90%)</li>
+                            </ul>
+                        </div>`;
+                    
+                    // Create sample graph data
+                    const nodes = new vis.DataSet([
+                        { id: 1, label: 'malware.exe', title: 'Process: malware.exe<br>PID: 1234', color: '#FF5733', shape: 'dot', size: 20 },
+                        { id: 2, label: 'svchost.exe', title: 'Process: svchost.exe<br>PID: 2345', color: '#FF5733', shape: 'dot', size: 16 },
+                        { id: 3, label: '10.0.0.1:443', title: 'Network: 10.0.0.1:443', color: '#3357FF', shape: 'dot', size: 16 },
+                        { id: 4, label: 'important.docx', title: 'File: C:\\Users\\Documents\\important.docx', color: '#33FF57', shape: 'dot', size: 16 },
+                        { id: 5, label: 'HKLM\\Run', title: 'Registry: HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run', color: '#FF33F5', shape: 'dot', size: 16 }
+                    ]);
+                    
+                    const edges = new vis.DataSet([
+                        { from: 1, to: 2, label: 'spawns', arrows: 'to', color: {color: '#848484', opacity: 0.8} },
+                        { from: 1, to: 3, label: 'connects to', arrows: 'to', color: {color: '#848484', opacity: 0.8} },
+                        { from: 1, to: 4, label: 'encrypts', arrows: 'to', color: {color: '#848484', opacity: 0.8} },
+                        { from: 1, to: 5, label: 'modifies', arrows: 'to', color: {color: '#848484', opacity: 0.8} }
+                    ]);
+                    
+                    // Create network
+                    const container = document.getElementById('interactive-graph');
+                    const data = {
+                        nodes: nodes,
+                        edges: edges
+                    };
+                    const options = {
+                        nodes: {
+                            shape: 'dot',
+                            size: 16,
+                            font: {
+                                size: 14
+                            },
+                            borderWidth: 2,
+                            shadow: true
+                        },
+                        edges: {
+                            width: 2,
+                            shadow: true,
+                            font: {
+                                size: 12,
+                                align: 'middle'
+                            },
+                            arrows: {
+                                to: { enabled: true, scaleFactor: 1 }
+                            }
+                        },
+                        physics: {
+                            stabilization: true,
+                            barnesHut: {
+                                gravitationalConstant: -8000,
+                                springConstant: 0.04,
+                                springLength: 95
+                            }
+                        },
+                        interaction: {
+                            navigationButtons: true,
+                            keyboard: true,
+                            tooltipDelay: 200
+                        }
+                    };
+                    new vis.Network(container, data, options);
+                };
+                document.head.appendChild(script);
             }, 1000);
         });
         
@@ -617,8 +708,50 @@
                             </ul>
                         </div>
                     </div>
-                    <p><a href="#" style="display: inline-block; padding: 10px 15px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px;">Download Report</a></p>
+                    <p><button id="download-report" class="button download-button">Download Report</button></p>
                 `;
+                
+                // Add download functionality
+                document.getElementById('download-report').addEventListener('click', function() {
+                    const reportContent = document.querySelector('.report-content').innerHTML;
+                    const fullReport = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Cyber Attack Trace Analysis Report</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333; }
+                            .report-title { background-color: #34495e; color: white; padding: 15px; margin-bottom: 20px; }
+                            .report-section { margin-bottom: 20px; }
+                            h2, h3, h4 { color: #2c3e50; }
+                            .technique-card { background-color: #e3f2fd; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+                            .technique-card h4 { color: #1565c0; margin-top: 0; }
+                            .suggestion-card { background-color: #e8f4f8; padding: 15px; margin-bottom: 15px; border-left: 5px solid #3498db; border-radius: 3px; }
+                            .suggestion-card h4 { margin-top: 0; color: #3498db; }
+                            .high-priority { border-left-color: #e74c3c; }
+                            .high-priority h4 { color: #e74c3c; }
+                            .medium-priority { border-left-color: #f39c12; }
+                            .medium-priority h4 { color: #f39c12; }
+                            .low-priority { border-left-color: #3498db; }
+                            .summary-item { margin-bottom: 5px; }
+                        </style>
+                    </head>
+                    <body>
+                        ${reportContent}
+                    </body>
+                    </html>
+                    `;
+                    
+                    const blob = new Blob([fullReport], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'cyber_attack_report_' + dateStr.replace(/\//g, '-') + '.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
             }, 1000);
         });
         

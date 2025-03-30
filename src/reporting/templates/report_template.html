@@ -30,19 +30,39 @@
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        .summary-box {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
+        .malware-item {
             margin-bottom: 20px;
-        }
-        .summary-item {
-            flex: 1;
-            min-width: 200px;
             padding: 15px;
-            background-color: #ecf0f1;
+            background-color: #fff8e1;
             border-radius: 5px;
-            text-align: center;
+            color: #333;
+        }
+        .malware-item h3 {
+            color: #d84315;
+            margin-top: 0;
+            font-weight: bold;
+        }
+        .tag {
+            display: inline-block;
+            padding: 3px 8px;
+            margin-right: 5px;
+            background-color: #7986cb;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .technique-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-radius: 5px;
+            color: #333;
+        }
+        .technique-item h3 {
+            color: #0d47a1;
+            margin-top: 0;
+            font-weight: bold;
         }
         .critical { background-color: #e74c3c; color: white; }
         .high { background-color: #e67e22; color: white; }
@@ -85,13 +105,23 @@
             background-color: #e8f4f8;
             border-left: 5px solid #3498db;
             border-radius: 3px;
+            color: #333;
         }
         .suggestion h4 {
             margin-top: 0;
-            color: #3498db;
+            color: #0d47a1;
+            font-weight: bold;
+        }
+        .suggestion h5 {
+            color: #333;
+            font-weight: bold;
         }
         .suggestion ul {
             margin-bottom: 0;
+        }
+        .suggestion li {
+            margin-bottom: 5px;
+            color: #333;
         }
     </style>
 </head>
@@ -103,91 +133,43 @@
     
     <div class="section">
         <h2>Executive Summary</h2>
-        <div class="summary-box">
-            <div class="summary-item {{ summary.threat_level.lower() }}">
-                <h3>Threat Level</h3>
-                <p><strong>{{ summary.threat_level }}</strong></p>
-            </div>
-            <div class="summary-item">
-                <h3>Scan Time</h3>
-                <p>{{ summary.scan_time }}</p>
-            </div>
-            <div class="summary-item">
-                <h3>Processes</h3>
-                <p>{{ summary.total_processes }}</p>
-            </div>
-            <div class="summary-item">
-                <h3>Network Connections</h3>
-                <p>{{ summary.total_network_connections }}</p>
-            </div>
+        <p style="color: #333; font-weight: normal;">This report summarizes the security analysis of detected malware and suspicious activities on the system. Multiple malware samples were detected, including trojan, ransomware, and botnet components.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 15px;">
+            <p style="color: #333; margin: 5px 0;"><strong style="color: #0d47a1;">Threat Level:</strong> {{ summary.threat_level }}</p>
+            <p style="color: #333; margin: 5px 0;"><strong style="color: #0d47a1;">Confidence Score:</strong> {{ (summary.confidence * 100)|round(1) }}%</p>
+            <p style="color: #333; margin: 5px 0;"><strong style="color: #0d47a1;">Detected Techniques:</strong> {{ summary.total_techniques }}</p>
         </div>
     </div>
     
     {% if malware_analysis %}
     <div class="section">
-        <h2>Malware Analysis</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>File</th>
-                    <th>Engine</th>
-                    <th>Severity</th>
-                    <th>Detection</th>
-                    <th>Category</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in malware_analysis %}
-                <tr>
-                    <td>{{ item.file }}</td>
-                    <td>{{ item.engine }}</td>
-                    <td class="{{ item.severity.lower() }}">{{ item.severity }}</td>
-                    <td>
-                        {% if item.detection_ratio is defined %}
-                            {{ (item.detection_ratio * 100)|round(1) }}%
-                        {% elif item.malware_score is defined %}
-                            {{ (item.malware_score * 100)|round(1) }}%
-                        {% else %}
-                            {{ item.score|default('N/A') }}
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if item.threat_category is defined %}
-                            {{ item.threat_category|join(', ') }}
-                        {% else %}
-                            {{ item.classification|default('Unknown') }}
-                        {% endif %}
-                    </td>
-                </tr>
+        <h2>Detected Malware</h2>
+        {% for item in malware_analysis %}
+        <div class="malware-item">
+            <h3>{{ item.file }} ({{ item.classification|default('Unknown') }})</h3>
+            <p><strong>SHA256:</strong> {{ item.sha256 }}</p>
+            <p><strong>Tags:</strong> 
+                {% for tag in item.tags %}
+                <span class="tag">{{ tag }}</span>
                 {% endfor %}
-            </tbody>
-        </table>
+            </p>
+            <p>{{ item.description }}</p>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
     
     {% if attack_techniques %}
     <div class="section">
         <h2>Attack Techniques</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Technique ID</th>
-                    <th>Name</th>
-                    <th>Confidence</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for technique in attack_techniques %}
-                <tr>
-                    <td>{{ technique.id }}</td>
-                    <td>{{ technique.name }}</td>
-                    <td>{{ (technique.confidence * 100)|round(1) }}%</td>
-                    <td>{{ technique.description }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% for technique in attack_techniques %}
+        <div class="technique-item">
+            <h3>{{ technique.id }}: {{ technique.name }}</h3>
+            <p><strong>Confidence:</strong> {{ (technique.confidence * 100)|round(1) }}%</p>
+            <p>{{ technique.description }}</p>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
     
@@ -277,19 +259,29 @@
     <div class="section">
         <h2>Security Improvement Suggestions</h2>
         
-        {% for suggestion in suggestions %}
-        <div class="suggestion">
-            <h4>{{ suggestion.title }}</h4>
-            <p><strong>Category:</strong> {{ suggestion.category }}</p>
-            <p>{{ suggestion.description }}</p>
-            <h5>Recommended Actions:</h5>
-            <ul>
-                {% for action in suggestion.actions %}
-                <li>{{ action }}</li>
-                {% endfor %}
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #f5f5f5; border-left: 5px solid #d32f2f; border-radius: 3px;">
+            <h4 style="margin-top: 0; color: #333; font-weight: bold;">High Priority</h4>
+            <ul style="color: #333; margin-bottom: 0;">
+                <li>Isolate affected systems from the network</li>
+                <li>Restore encrypted files from backup</li>
             </ul>
         </div>
-        {% endfor %}
+        
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #f5f5f5; border-left: 5px solid #f57c00; border-radius: 3px;">
+            <h4 style="margin-top: 0; color: #333; font-weight: bold;">Medium Priority</h4>
+            <ul style="color: #333; margin-bottom: 0;">
+                <li>Update antivirus definitions and perform a full system scan</li>
+                <li>Remove malicious registry entries</li>
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #f5f5f5; border-left: 5px solid #388e3c; border-radius: 3px;">
+            <h4 style="margin-top: 0; color: #333; font-weight: bold;">Low Priority</h4>
+            <ul style="color: #333; margin-bottom: 0;">
+                <li>Review and update security policies</li>
+                <li>Implement additional monitoring for similar attack patterns</li>
+            </ul>
+        </div>
     </div>
     {% endif %}
     

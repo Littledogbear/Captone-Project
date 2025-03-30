@@ -54,6 +54,12 @@
         button:hover {
             background-color: #45a049;
         }
+        .download-btn {
+            background-color: #2196F3;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
         .description {
             margin-bottom: 20px;
             padding: 15px;
@@ -74,7 +80,8 @@
     <div class="controls">
         <button onclick="network.fit()">Fit View</button>
         <button onclick="togglePhysics()">Toggle Physics</button>
-        <button onclick="toggleEdgeLabels()">Toggle Edge Labels</button>
+        <button id="edgeLabelsBtn" onclick="toggleEdgeLabels()">Hide Edge Labels</button>
+        <button class="download-btn" onclick="downloadGraph()">Download Graph</button>
     </div>
     
     <div id="mynetwork"></div>
@@ -115,6 +122,22 @@
         var nodes = new vis.DataSet(NODES_DATA);
         var edges = new vis.DataSet(EDGES_DATA);
         
+        // Initialize with edge labels visible
+        window.onload = function() {
+            // Ensure edge labels are visible by default
+            setTimeout(function() {
+                // Force edge labels to be visible
+                var edgeOptions = {
+                    font: {
+                        size: 12,
+                        align: 'middle',
+                        background: 'rgba(255, 255, 255, 0.7)'
+                    }
+                };
+                network.setOptions({ edges: edgeOptions });
+            }, 500);
+        };
+        
         // Create a network
         var container = document.getElementById('mynetwork');
         var data = {
@@ -131,12 +154,21 @@
             edges: {
                 font: {
                     size: 12,
-                    align: 'middle'
+                    align: 'middle',
+                    background: 'rgba(255, 255, 255, 0.7)'
                 },
                 arrows: {
                     to: {enabled: true, scaleFactor: 1}
                 },
-                smooth: {type: 'continuous'}
+                smooth: {type: 'continuous'},
+                color: {
+                    inherit: false,
+                    color: '#848484',
+                    highlight: '#00CC66'
+                },
+                width: 2,
+                selectionWidth: 3,
+                hoverWidth: 2
             },
             physics: {
                 enabled: true,
@@ -207,6 +239,22 @@
                 options.edges.font.size = 0;
             }
             network.setOptions(options);
+        }
+        
+        // Download graph as JSON
+        function downloadGraph() {
+            const graphData = {
+                nodes: nodes.get(),
+                edges: edges.get()
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graphData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "malware_knowledge_graph_" + new Date().toISOString().slice(0,19).replace(/:/g,"-") + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
         }
         
         // Highlight connected nodes on click

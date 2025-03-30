@@ -336,9 +336,155 @@ def main():
             webbrowser.open(report_url)
             print(f"\nReport available at: {report_url}")
         
+        dashboard_dir = Path("output/dashboard_enhanced_graph")
+        dashboard_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dashboard_file = str(dashboard_dir / f"integrated_dashboard_{timestamp}.html")
+        
+        dashboard_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Cyber Attack Tracer - Real-time Monitoring Dashboard</title>
+            <meta charset="utf-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                }
+                .header {
+                    background-color: #2c3e50;
+                    color: white;
+                    padding: 15px;
+                    text-align: center;
+                }
+                .tabs {
+                    display: flex;
+                    background-color: #34495e;
+                }
+                .tab {
+                    padding: 15px 20px;
+                    color: white;
+                    cursor: pointer;
+                }
+                .tab.active {
+                    background-color: #2980b9;
+                }
+                .content {
+                    padding: 20px;
+                }
+                .tab-content {
+                    display: none;
+                }
+                .tab-content.active {
+                    display: block;
+                }
+                iframe {
+                    width: 100%;
+                    height: 800px;
+                    border: 1px solid #ddd;
+                }
+                .button {
+                    background-color: #2980b9;
+                    color: white;
+                    padding: 10px 15px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                    margin-bottom: 10px;
+                }
+                .button:hover {
+                    background-color: #3498db;
+                }
+                .download-btn {
+                    background-color: #27ae60;
+                }
+                .download-btn:hover {
+                    background-color: #2ecc71;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Cyber Attack Tracer - Real-time Monitoring Dashboard</h1>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="openTab('system')">System Monitoring</div>
+                <div class="tab" onclick="openTab('alerts')">Alerts</div>
+                <div class="tab" onclick="openTab('graph')">Knowledge Graph</div>
+                <div class="tab" onclick="openTab('report')">Report</div>
+            </div>
+            
+            <div class="content">
+                <div id="system" class="tab-content active">
+                    <h2>System Monitoring</h2>
+                    <iframe src="DASHBOARD_URL"></iframe>
+                </div>
+                
+                <div id="alerts" class="tab-content">
+                    <h2>Alerts</h2>
+                    <iframe src="DASHBOARD_URL"></iframe>
+                </div>
+                
+                <div id="graph" class="tab-content">
+                    <h2>Knowledge Graph</h2>
+                    <div>
+                        <button class="button download-btn" onclick="window.open('GRAPH_JSON_URL', '_blank')">Download Graph JSON</button>
+                    </div>
+                    <iframe src="GRAPH_HTML_URL"></iframe>
+                </div>
+                
+                <div id="report" class="tab-content">
+                    <h2>Analysis Report</h2>
+                    <div>
+                        <button class="button download-btn" onclick="window.open('REPORT_URL', '_blank')">Download Report</button>
+                    </div>
+                    <iframe src="REPORT_URL"></iframe>
+                </div>
+            </div>
+            
+            <script>
+                function openTab(tabName) {
+                    var i, tabContent, tabLinks;
+                    
+                    tabContent = document.getElementsByClassName("tab-content");
+                    for (i = 0; i < tabContent.length; i++) {
+                        tabContent[i].className = tabContent[i].className.replace(" active", "");
+                    }
+                    
+                    tabLinks = document.getElementsByClassName("tab");
+                    for (i = 0; i < tabLinks.length; i++) {
+                        tabLinks[i].className = tabLinks[i].className.replace(" active", "");
+                    }
+                    
+                    document.getElementById(tabName).className += " active";
+                    document.querySelector(`.tab[onclick="openTab('${tabName}')"]`).className += " active";
+                }
+            </script>
+        </body>
+        </html>
+        """
+        
         dashboard_template_url = f"{dashboard_url}src/alerting/templates/real_time_dashboard.html"
-        webbrowser.open(dashboard_template_url)
-        print(f"\nDashboard available at: {dashboard_template_url}")
+        graph_html_url = f"file://{os.path.abspath(html_path)}" if html_path else ""
+        graph_json_url = f"file://{os.path.abspath(graph_path)}" if graph_path else ""
+        report_url = f"file://{os.path.abspath(report_path)}" if report_path else ""
+        
+        dashboard_html = dashboard_html.replace("DASHBOARD_URL", dashboard_template_url)
+        dashboard_html = dashboard_html.replace("GRAPH_HTML_URL", graph_html_url)
+        dashboard_html = dashboard_html.replace("GRAPH_JSON_URL", graph_json_url)
+        dashboard_html = dashboard_html.replace("REPORT_URL", report_url)
+        
+        with open(dashboard_file, 'w') as f:
+            f.write(dashboard_html)
+        
+        dashboard_url = f"file://{os.path.abspath(dashboard_file)}"
+        webbrowser.open(dashboard_url)
+        print(f"\nIntegrated dashboard available at: {dashboard_url}")
         
         print("\nPress Ctrl+C to stop the dashboard")
         

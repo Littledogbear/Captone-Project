@@ -21,9 +21,11 @@ from src.attribution.geolocation import IPGeolocation
 from src.attribution.tool_fingerprinting import ToolFingerprinting
 from src.attribution.attribution_engine import AttributionEngine
 from src.alerting.real_time_monitor import RealTimeMonitor
+from src.alerting.enhanced_real_time_monitor import EnhancedRealTimeMonitor
 from src.alerting.alert_manager import AlertManager
 from src.alerting.notification_service import NotificationService
 from src.alerting.alert_dashboard import AlertDashboard
+from src.alerting.dashboard_integrator import DashboardIntegrator
 from datetime import datetime
 
 # Initialize FastAPI app
@@ -54,16 +56,18 @@ malware_categorizer = None
 trend_analyzer = None
 attribution_engine = None
 real_time_monitor = None
+enhanced_monitor = None
 alert_manager = None
 notification_service = None
 alert_dashboard = None
+dashboard_integrator = None
 
 def init_components():
     """Initialize components in background."""
     global trace_collector, trace_analyzer, virustotal_analyzer, knowledge_graph_builder
     global technique_identifier, graph_visualizer, malware_categorizer, trend_analyzer
-    global attribution_engine, real_time_monitor, alert_manager, notification_service
-    global alert_dashboard
+    global attribution_engine, real_time_monitor, enhanced_monitor, alert_manager
+    global notification_service, alert_dashboard, dashboard_integrator
     try:
         trace_collector = TraceCollector()
         trace_analyzer = TraceAnalyzer()
@@ -77,7 +81,9 @@ def init_components():
         alert_manager = AlertManager()
         notification_service = NotificationService()
         real_time_monitor = RealTimeMonitor()
+        enhanced_monitor = EnhancedRealTimeMonitor()
         alert_dashboard = AlertDashboard()
+        dashboard_integrator = DashboardIntegrator()
         logger.info("Components initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing components: {str(e)}")
@@ -110,6 +116,11 @@ async def startup_event():
             dashboard_thread.start()
             logger.info("Alert dashboard will start when components are ready")
         
+        if config.get("monitoring_dashboard", {}).get("enabled", False):
+            monitoring_thread = threading.Thread(target=lambda: _start_monitoring_dashboard_when_ready(), daemon=True)
+            monitoring_thread.start()
+            logger.info("Monitoring dashboard will start when components are ready")
+        
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error in startup: {str(e)}")
@@ -134,6 +145,20 @@ def _start_dashboard_when_ready():
     # Start dashboard
     alert_dashboard.start()
     logger.info("Alert dashboard started")
+
+def _start_monitoring_dashboard_when_ready():
+    """Start monitoring dashboard when components are ready."""
+    import time
+    while dashboard_integrator is None:
+        time.sleep(1)
+    
+    config = load_config().get("monitoring_dashboard", {})
+    host = config.get("host", "127.0.0.1")
+    port = config.get("port", 8081)
+    
+    # Start dashboard
+    dashboard_integrator.start_dashboard(host, port)
+    logger.info(f"Monitoring dashboard started at http://{host}:{port}")
 
 # Load logging configuration
 config_path = Path("config/logging_config.yaml")
@@ -464,3 +489,112 @@ async def get_dashboard_url() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting dashboard URL: {str(e)}")
         raise HTTPException(status_code=500, detail="Error getting dashboard URL")
+
+@app.get("/monitoring-dashboard")
+async def get_monitoring_dashboard_url() -> Dict[str, Any]:
+    """Get the URL for the monitoring dashboard."""
+    if not dashboard_integrator:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - dashboard integrator not ready"
+        )
+    try:
+        status = dashboard_integrator.get_dashboard_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting monitoring dashboard URL: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error getting monitoring dashboard URL")
+
+@app.post("/monitoring-dashboard/start")
+async def start_monitoring_dashboard() -> Dict[str, Any]:
+    """Start the monitoring dashboard."""
+    if not dashboard_integrator:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - dashboard integrator not ready"
+        )
+    try:
+        config = load_config().get("monitoring_dashboard", {})
+        host = config.get("host", "127.0.0.1")
+        port = config.get("port", 8081)
+        
+        result = dashboard_integrator.start_dashboard(host, port)
+        return result
+    except Exception as e:
+        logger.error(f"Error starting monitoring dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error starting monitoring dashboard")
+
+@app.post("/monitoring-dashboard/stop")
+async def stop_monitoring_dashboard() -> Dict[str, Any]:
+    """Stop the monitoring dashboard."""
+    if not dashboard_integrator:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - dashboard integrator not ready"
+        )
+    try:
+        result = dashboard_integrator.stop_dashboard()
+        return result
+    except Exception as e:
+        logger.error(f"Error stopping monitoring dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error stopping monitoring dashboard")
+
+@app.get("/enhanced-monitoring/status")
+async def get_enhanced_monitoring_status() -> Dict[str, Any]:
+    """Get enhanced real-time monitoring status."""
+    if not enhanced_monitor:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - enhanced monitor not ready"
+        )
+    try:
+        status = enhanced_monitor.get_monitoring_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting enhanced monitoring status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error getting enhanced monitoring status")
+
+@app.post("/enhanced-monitoring/start")
+async def start_enhanced_monitoring() -> Dict[str, Any]:
+    """Start enhanced real-time monitoring."""
+    if not enhanced_monitor:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - enhanced monitor not ready"
+        )
+    try:
+        enhanced_monitor.start_monitoring()
+        return {"status": "enhanced_monitoring_started"}
+    except Exception as e:
+        logger.error(f"Error starting enhanced monitoring: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error starting enhanced monitoring")
+
+@app.post("/enhanced-monitoring/stop")
+async def stop_enhanced_monitoring() -> Dict[str, Any]:
+    """Stop enhanced real-time monitoring."""
+    if not enhanced_monitor:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - enhanced monitor not ready"
+        )
+    try:
+        enhanced_monitor.stop_monitoring()
+        return {"status": "enhanced_monitoring_stopped"}
+    except Exception as e:
+        logger.error(f"Error stopping enhanced monitoring: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error stopping enhanced monitoring")
+
+@app.get("/enhanced-monitoring/alerts")
+async def get_enhanced_alerts(limit: int = 100) -> List[Dict[str, Any]]:
+    """Get recent alerts from enhanced monitoring."""
+    if not enhanced_monitor:
+        raise HTTPException(
+            status_code=503,
+            detail="System initializing - enhanced monitor not ready"
+        )
+    try:
+        alerts = enhanced_monitor.get_recent_alerts(limit)
+        return alerts
+    except Exception as e:
+        logger.error(f"Error getting enhanced alerts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error getting enhanced alerts")

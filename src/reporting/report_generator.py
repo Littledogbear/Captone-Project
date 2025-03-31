@@ -175,13 +175,24 @@ class ReportGenerator:
         techniques = []
         
         # Process techniques from knowledge graph
-        for technique in analysis_data.get("techniques", []):
-            techniques.append({
-                "id": technique.get("technique_id", ""),
-                "name": technique.get("technique_name", ""),
-                "confidence": technique.get("confidence", 0),
-                "description": self._get_technique_description(technique.get("technique_id", ""))
-            })
+        techniques_data = analysis_data.get("techniques", {})
+        
+        if isinstance(techniques_data, dict):
+            for technique_id, technique_data in techniques_data.items():
+                techniques.append({
+                    "id": technique_id,
+                    "name": technique_data.get("name", "Unknown"),
+                    "confidence": technique_data.get("confidence", 0),
+                    "description": self._get_technique_description(technique_id)
+                })
+        else:
+            for technique in techniques_data:
+                techniques.append({
+                    "id": technique.get("technique_id", ""),
+                    "name": technique.get("technique_name", ""),
+                    "confidence": technique.get("confidence", 0),
+                    "description": self._get_technique_description(technique.get("technique_id", ""))
+                })
             
         return techniques
         
@@ -232,7 +243,8 @@ class ReportGenerator:
             visualizations["network_activity"] = network_viz
             
         # Generate attack technique visualization
-        technique_viz = self._generate_technique_visualization(analysis_data.get("techniques", []))
+        techniques = analysis_data.get("techniques", [])
+        technique_viz = self._generate_technique_visualization(techniques)
         if technique_viz:
             visualizations["attack_techniques"] = technique_viz
             
@@ -324,9 +336,18 @@ class ReportGenerator:
             # Create plot
             plt.figure(figsize=(10, 6))
             
-            technique_names = [f"{t.get('technique_name', 'Unknown')} ({t.get('technique_id', '')})" 
-                              for t in techniques]
-            confidence_levels = [t.get("confidence", 0) * 100 for t in techniques]
+            if isinstance(techniques, dict):
+                technique_names = []
+                confidence_levels = []
+                for technique_id, technique_data in techniques.items():
+                    name = technique_data.get('name', 'Unknown')
+                    confidence = technique_data.get('confidence', 0) * 100
+                    technique_names.append(f"{name} ({technique_id})")
+                    confidence_levels.append(confidence)
+            else:
+                technique_names = [f"{t.get('name', t.get('technique_name', 'Unknown'))} ({t.get('id', t.get('technique_id', ''))})" 
+                                  for t in techniques]
+                confidence_levels = [t.get("confidence", 0) * 100 for t in techniques]
             
             # Set colors based on confidence
             colors = ['red' if c >= 80 else 'orange' if c >= 60 else 'yellow' if c >= 40 else 'green' 

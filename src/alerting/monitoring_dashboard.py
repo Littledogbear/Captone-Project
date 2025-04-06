@@ -33,10 +33,11 @@ class MonitoringDashboard:
     
     def __init__(self):
         """Initialize the MonitoringDashboard."""
-        self.host = "127.0.0.1"
-        self.port = 8081
+        self.host = os.environ.get("DASHBOARD_HOST", "127.0.0.1")
+        self.port = int(os.environ.get("DASHBOARD_PORT", "8083"))
         self.server = None
         self.server_thread = None
+        self.background_thread = None
         self.running = False
         
         self.system_monitor = SystemMonitor()
@@ -45,7 +46,7 @@ class MonitoringDashboard:
         self.graph_visualizer = GraphVisualizer()
         self.report_generator = ReportGenerator()
         
-        self.app = FastAPI(title="Cyber Attack Tracer - Monitoring Dashboard")
+        self.app = FastAPI(title="Cyber Attack Tracer - Real-time Monitoring Dashboard")
         
         self.templates_dir = Path(__file__).parent / "templates"
         self.templates_dir.mkdir(exist_ok=True)
@@ -68,6 +69,11 @@ class MonitoringDashboard:
         self.server_thread = threading.Thread(target=self._run_server)
         self.server_thread.daemon = True
         self.server_thread.start()
+        
+        self.background_thread = threading.Thread(target=self.start_background_tasks)
+        self.background_thread.daemon = True
+        self.background_thread.start()
+        
         logger.info(f"Monitoring dashboard started at http://{self.host}:{self.port}")
     
     def stop(self):
@@ -77,6 +83,8 @@ class MonitoringDashboard:
             self.server.should_exit = True
         if self.server_thread:
             self.server_thread.join(timeout=5.0)
+        if hasattr(self, 'background_thread') and self.background_thread:
+            self.background_thread.join(timeout=5.0)
         logger.info("Monitoring dashboard stopped")
     
     def _run_server(self):
@@ -102,11 +110,41 @@ class MonitoringDashboard:
             """WebSocket endpoint for real-time updates."""
             await websocket.accept()
             self.active_connections.append(websocket)
+            
+            try:
+                status = self.real_time_monitor.get_monitoring_status()
+                system_status = self.system_monitor.get_system_status()
+                
+                combined_status = {
+                    **status,
+                    **system_status,
+                    "type": "system_status",
+                    "monitoring_status": "Running" if status.get("running", False) else "Stopped"
+                }
+                
+                await websocket.send_json(combined_status)
+                
+                alerts = self.real_time_monitor.get_recent_alerts(10)
+                if alerts:
+                    for alert in alerts:
+                        await websocket.send_json({
+                            "type": "alert",
+                            "alert": alert if isinstance(alert, dict) else alert.to_dict()
+                        })
+            except Exception as e:
+                logger.error(f"Error sending initial data: {str(e)}")
+            
             try:
                 while True:
-                    await websocket.receive_text()
+                    data = await websocket.receive_text()
+                    if data == "ping":
+                        await websocket.send_text("pong")
             except WebSocketDisconnect:
                 self.active_connections.remove(websocket)
+            except Exception as e:
+                logger.error(f"WebSocket error: {str(e)}")
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
         
         @self.app.get("/monitoring/status")
         async def get_monitoring_status():
@@ -191,7 +229,7 @@ class MonitoringDashboard:
                     "system_activity": traces[-1],
                     "analysis_result": {
                         "severity": "medium",
-                        "confidence": 0.8,
+                        "confidence": 80,
                         "malware_type": "Unknown"
                     }
                 }
@@ -235,8 +273,129 @@ class MonitoringDashboard:
             except Exception as e:
                 logger.error(f"Error broadcasting message: {str(e)}")
     
+    def add_alert(self, alert: Dict[str, Any]):
+        """
+        Add an alert to the dashboard.
+        
+        Args:
+            alert: Alert dictionary
+        """
+        try:
+            if isinstance(alert, dict) and "type" not in alert and "alert_type" in alert:
+                alert["type"] = "alert"
+            
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                loop.run_until_complete(self._broadcast_message({
+                    "type": "alert",
+                    "alert": alert
+                }))
+            finally:
+                loop.close()
+                
+            logger.info(f"Alert added to dashboard: {alert.get('title', '')}")
+        except Exception as e:
+            logger.error(f"Error adding alert to dashboard: {str(e)}")
+    
+    def add_knowledge_graph(self, graph, graph_url: str = None):
+        """
+        Add a knowledge graph to the dashboard.
+        
+        Args:
+            graph: NetworkX DiGraph object
+            graph_url: URL to the graph visualization
+        """
+        try:
+            if graph_url is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                graph_url = f"/static/knowledge_graph_{timestamp}.png"
+            
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                loop.run_until_complete(self._broadcast_message({
+                    "type": "knowledge_graph",
+                    "graph_url": graph_url,
+                    "nodes": len(graph.nodes()),
+                    "edges": len(graph.edges()),
+                    "timestamp": datetime.now().isoformat()
+                }))
+            finally:
+                loop.close()
+                
+            logger.info(f"Knowledge graph added to dashboard: {graph_url}")
+        except Exception as e:
+            logger.error(f"Error adding knowledge graph to dashboard: {str(e)}")
+    
+    def add_report(self, report_url: str):
+        """
+        Add a report to the dashboard.
+        
+        Args:
+            report_url: URL to the report
+        """
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                loop.run_until_complete(self._broadcast_message({
+                    "type": "report",
+                    "report": {
+                        "report_url": report_url,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }))
+            finally:
+                loop.close()
+                
+            logger.info(f"Report added to dashboard: {report_url}")
+        except Exception as e:
+            logger.error(f"Error adding report to dashboard: {str(e)}")
+    
     def _create_dashboard_template(self):
         """Create the dashboard HTML template."""
         dashboard_template = self.templates_dir / "monitoring_dashboard.html"
         if dashboard_template.exists():
             return
+            
+    def start_background_tasks(self):
+        """Start background tasks for sending updates to WebSocket clients."""
+        import asyncio
+        
+        async def send_system_status():
+            """Send system status updates to WebSocket clients."""
+            while self.running:
+                try:
+                    status = self.real_time_monitor.get_monitoring_status()
+                    system_status = self.system_monitor.get_system_status()
+                    
+                    combined_status = {
+                        **status,
+                        **system_status,
+                        "type": "system_status",
+                        "monitoring_status": "Running" if status.get("running", False) else "Stopped"
+                    }
+                    
+                    await self._broadcast_message(combined_status)
+                except Exception as e:
+                    logger.error(f"Error sending system status: {str(e)}")
+                
+                await asyncio.sleep(2)  # Send updates every 2 seconds
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            loop.create_task(send_system_status())
+            loop.run_forever()
+        except Exception as e:
+            logger.error(f"Error starting background tasks: {str(e)}")
+        finally:
+            loop.close()

@@ -7,11 +7,17 @@ This module provides integration between the monitoring dashboard and the main a
 import logging
 import threading
 import os
+import json
+import shutil
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union
+
+import networkx as nx
 
 from src.alerting.monitoring_dashboard import MonitoringDashboard
 from src.utils.config import load_config
+from src.knowledge_graph.enhanced_graph_builder import EnhancedGraphBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,9 @@ class DashboardIntegrator:
         os.makedirs("logs", exist_ok=True)
         os.makedirs("output/dashboard_graphs", exist_ok=True)
         os.makedirs("output/dashboard_reports", exist_ok=True)
+        
+        static_dir = Path(__file__).parent / "static"
+        static_dir.mkdir(exist_ok=True)
         
         logger.info("Dashboard integrator initialized")
     
@@ -124,3 +133,154 @@ class DashboardIntegrator:
                 "status": "error",
                 "error": str(e)
             }
+    
+    def add_alert(self, alert: Dict[str, Any]) -> bool:
+        """
+        Add an alert to the dashboard.
+        
+        Args:
+            alert: Alert dictionary
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.running or self.dashboard is None:
+            logger.warning("Dashboard is not running")
+            return False
+        
+        try:
+            self.dashboard.add_alert(alert)
+            return True
+        except Exception as e:
+            logger.error(f"Error adding alert to dashboard: {str(e)}")
+            return False
+    
+    def add_knowledge_graph(self, graph: Union[nx.DiGraph, Dict[str, Any], str]) -> bool:
+        """
+        Add a knowledge graph to the dashboard.
+        
+        Args:
+            graph: NetworkX DiGraph, dictionary representation of a graph, or path to a graph file
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.running or self.dashboard is None:
+            logger.warning("Dashboard is not running")
+            return False
+        
+        try:
+            if isinstance(graph, str) and os.path.exists(graph):
+                with open(graph, 'r') as f:
+                    graph_data = json.load(f)
+                
+                static_dir = Path(__file__).parent / "static"
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                static_graph_path = static_dir / f"knowledge_graph_{timestamp}.json"
+                
+                shutil.copy(graph, static_graph_path)
+                
+                graph_builder = EnhancedGraphBuilder()
+                graph_obj = graph_builder.build_graph(graph_data)
+                
+                self.dashboard.add_knowledge_graph(graph_obj, f"/static/knowledge_graph_{timestamp}.json")
+                return True
+            
+            elif isinstance(graph, dict):
+                graph_builder = EnhancedGraphBuilder()
+                graph_obj = graph_builder.build_graph(graph)
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_dir = Path("output/dashboard_graphs")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / f"knowledge_graph_{timestamp}.json"
+                
+                with open(output_path, 'w') as f:
+                    json.dump(graph, f, indent=2)
+                
+                static_dir = Path(__file__).parent / "static"
+                static_graph_path = static_dir / f"knowledge_graph_{timestamp}.json"
+                
+                shutil.copy(output_path, static_graph_path)
+                
+                self.dashboard.add_knowledge_graph(graph_obj, f"/static/knowledge_graph_{timestamp}.json")
+                return True
+            
+            elif isinstance(graph, nx.DiGraph):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_dir = Path("output/dashboard_graphs")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / f"knowledge_graph_{timestamp}.json"
+                
+                graph_dict = nx.node_link_data(graph)
+                
+                with open(output_path, 'w') as f:
+                    json.dump(graph_dict, f, indent=2)
+                
+                static_dir = Path(__file__).parent / "static"
+                static_graph_path = static_dir / f"knowledge_graph_{timestamp}.json"
+                
+                shutil.copy(output_path, static_graph_path)
+                
+                self.dashboard.add_knowledge_graph(graph, f"/static/knowledge_graph_{timestamp}.json")
+                return True
+            
+            else:
+                logger.error(f"Unsupported graph type: {type(graph)}")
+                return False
+        except Exception as e:
+            logger.error(f"Error adding knowledge graph to dashboard: {str(e)}")
+            return False
+    
+    def add_report(self, report: Union[str, Dict[str, Any]]) -> bool:
+        """
+        Add a report to the dashboard.
+        
+        Args:
+            report: Path to a report file or report content dictionary
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.running or self.dashboard is None:
+            logger.warning("Dashboard is not running")
+            return False
+        
+        try:
+            if isinstance(report, str) and os.path.exists(report):
+                static_dir = Path(__file__).parent / "static"
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                static_report_path = static_dir / f"report_{timestamp}.html"
+                
+                shutil.copy(report, static_report_path)
+                
+                self.dashboard.add_report(f"/static/report_{timestamp}.html")
+                return True
+            
+            elif isinstance(report, dict):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_dir = Path("output/dashboard_reports")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / f"report_{timestamp}.html"
+                
+                from src.reporting.report_generator import ReportGenerator
+                report_generator = ReportGenerator()
+                report_html = report_generator.generate_report(report, "html")
+                
+                with open(output_path, 'w') as f:
+                    f.write(report_html)
+                
+                static_dir = Path(__file__).parent / "static"
+                static_report_path = static_dir / f"report_{timestamp}.html"
+                
+                shutil.copy(output_path, static_report_path)
+                
+                self.dashboard.add_report(f"/static/report_{timestamp}.html")
+                return True
+            
+            else:
+                logger.error(f"Unsupported report type: {type(report)}")
+                return False
+        except Exception as e:
+            logger.error(f"Error adding report to dashboard: {str(e)}")
+            return False

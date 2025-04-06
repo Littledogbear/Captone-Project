@@ -219,3 +219,164 @@ class IOCAnalyzer:
                     })
         
         return results
+        
+    def analyze_behavior_patterns(self, behaviors: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyze behavior patterns across multiple malware samples.
+        
+        Args:
+            behaviors: List of behavior dictionaries from multiple malware samples
+            
+        Returns:
+            Dictionary containing behavior pattern analysis results
+        """
+        try:
+            if not behaviors:
+                return {
+                    "timestamp": datetime.now().isoformat(),
+                    "sample_count": 0,
+                    "common_patterns": [],
+                    "techniques": {},
+                    "operations": {
+                        "process_operations": [],
+                        "file_operations": [],
+                        "network_operations": [],
+                        "registry_operations": []
+                    }
+                }
+                
+            self.logger.info(f"Analyzing behavior patterns across {len(behaviors)} samples")
+            
+            process_operations = set()
+            file_operations = set()
+            network_operations = set()
+            registry_operations = set()
+            
+            for behavior in behaviors:
+                if not isinstance(behavior, dict):
+                    continue
+                    
+                processes = behavior.get("processes", [])
+                if processes:
+                    for process in processes:
+                        if isinstance(process, dict):
+                            process_name = process.get("name", "")
+                            if process_name:
+                                process_operations.add(f"execute_{process_name}")
+                
+                files = behavior.get("files", [])
+                if files:
+                    for file in files:
+                        if isinstance(file, dict):
+                            operation = file.get("operation", "")
+                            if operation:
+                                file_operations.add(operation)
+                
+                network = behavior.get("network", [])
+                if network:
+                    for conn in network:
+                        if isinstance(conn, dict):
+                            remote_addr = conn.get("remote_addr", "")
+                            remote_port = conn.get("remote_port", "")
+                            if remote_addr and remote_port:
+                                network_operations.add("connect")
+                                network_operations.add(f"connect_to_{remote_addr}:{remote_port}")
+                
+                registry = behavior.get("registry", [])
+                if registry:
+                    for reg in registry:
+                        if isinstance(reg, dict):
+                            operation = reg.get("operation", "")
+                            key = reg.get("key", "")
+                            if operation and key:
+                                registry_operations.add(operation)
+                                registry_operations.add(f"{operation}_{key}")
+            
+            common_patterns = []
+            
+            if any("execute_" in op for op in process_operations):
+                common_patterns.append({
+                    "name": "Process execution",
+                    "description": "Executes processes, possibly to perform malicious activities",
+                    "severity": "medium"
+                })
+            
+            if any("encrypt" in op for op in file_operations):
+                common_patterns.append({
+                    "name": "File encryption",
+                    "description": "Encrypts files, typical of ransomware behavior",
+                    "severity": "high"
+                })
+            
+            if "connect" in network_operations:
+                common_patterns.append({
+                    "name": "Network communication",
+                    "description": "Establishes network connections, typical of command and control behavior",
+                    "severity": "high"
+                })
+            
+            if any("set" in op and "Run" in op for op in registry_operations):
+                common_patterns.append({
+                    "name": "Persistence mechanism",
+                    "description": "Modifies registry to establish persistence, typical of malware that wants to survive reboots",
+                    "severity": "medium"
+                })
+            
+            techniques = {}
+            
+            if any("inject" in op for op in process_operations):
+                techniques["T1055"] = {
+                    "name": "Process Injection",
+                    "confidence": 0.85,
+                    "description": "Injects code into other processes to evade detection or gain privileges"
+                }
+            
+            if "connect" in network_operations:
+                techniques["T1071"] = {
+                    "name": "Command and Control",
+                    "confidence": 0.8,
+                    "description": "Establishes command and control communications with remote servers"
+                }
+            
+            if any("encrypt" in op for op in file_operations):
+                techniques["T1486"] = {
+                    "name": "Data Encrypted for Impact",
+                    "confidence": 0.9,
+                    "description": "Encrypts files on the system, potentially for ransomware purposes"
+                }
+            
+            if any("Run" in op for op in registry_operations):
+                techniques["T1547"] = {
+                    "name": "Boot or Logon Autostart Execution",
+                    "confidence": 0.75,
+                    "description": "Establishes persistence through registry or startup folder modifications"
+                }
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "sample_count": len(behaviors),
+                "common_patterns": common_patterns,
+                "techniques": techniques,
+                "operations": {
+                    "process_operations": list(process_operations),
+                    "file_operations": list(file_operations),
+                    "network_operations": list(network_operations),
+                    "registry_operations": list(registry_operations)
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Error analyzing behavior patterns: {str(e)}")
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "sample_count": len(behaviors) if isinstance(behaviors, list) else 0,
+                "common_patterns": [],
+                "techniques": {},
+                "operations": {
+                    "process_operations": [],
+                    "file_operations": [],
+                    "network_operations": [],
+                    "registry_operations": []
+                },
+                "error": str(e),
+                "status": "failed"
+            }

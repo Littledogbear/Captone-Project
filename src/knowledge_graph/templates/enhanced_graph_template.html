@@ -122,6 +122,20 @@
         var nodes = new vis.DataSet(NODES_DATA);
         var edges = new vis.DataSet(EDGES_DATA);
         
+        // Debug check to ensure edges are properly loaded
+        console.log("Loaded edges:", edges.length);
+        
+        // Fix edge format if needed
+        edges.forEach(function(edge) {
+            // Ensure from/to properties exist (required by vis.js)
+            if (!edge.from && edge.source) {
+                edge.from = edge.source;
+            }
+            if (!edge.to && edge.target) {
+                edge.to = edge.target;
+            }
+        });
+        
         // Initialize with edge labels visible
         window.onload = function() {
             // Ensure edge labels are visible by default
@@ -144,6 +158,10 @@
             nodes: nodes,
             edges: edges
         };
+        
+        // Debug the edges data
+        console.log("Edge data:", JSON.stringify(edges.get(), null, 2));
+        
         var options = {
             nodes: {
                 shape: 'dot',
@@ -160,7 +178,7 @@
                 arrows: {
                     to: {enabled: true, scaleFactor: 1}
                 },
-                smooth: {type: 'continuous'},
+                smooth: {enabled: true, type: 'dynamic', roundness: 0.5},
                 color: {
                     inherit: false,
                     color: '#848484',
@@ -168,7 +186,8 @@
                 },
                 width: 2,
                 selectionWidth: 3,
-                hoverWidth: 2
+                hoverWidth: 2,
+                hidden: false
             },
             physics: {
                 enabled: true,

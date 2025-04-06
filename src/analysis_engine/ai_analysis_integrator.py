@@ -258,6 +258,197 @@ class AIAnalysisIntegrator:
                 "emerging_techniques": ["Living off the land", "Fileless malware", "Supply chain attacks"]
             }
     
+    def analyze_multi_malware_scenario(self, samples: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyze a multi-malware attack scenario.
+        
+        Args:
+            samples: List of malware sample dictionaries
+            
+        Returns:
+            Dictionary containing comprehensive analysis results
+        """
+        try:
+            self.logger.info(f"Analyzing multi-malware scenario with {len(samples)} samples")
+            
+            all_techniques = {}
+            sample_types = []
+            
+            for sample in samples:
+                sample_type = sample.get("type", "unknown")
+                sample_types.append(sample_type)
+                
+                for technique_id, technique_data in sample.get("techniques", {}).items():
+                    if technique_id not in all_techniques:
+                        all_techniques[technique_id] = technique_data.copy()
+                        all_techniques[technique_id]["samples"] = []
+                    
+                    all_techniques[technique_id]["samples"].append(sample.get("name", "unknown"))
+            
+            interactions = self._analyze_sample_interactions(samples)
+            
+            suggestions = self._generate_multi_malware_suggestions(sample_types, all_techniques)
+            
+            threat_level = self._calculate_threat_level(samples, all_techniques)
+            
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "sample_count": len(samples),
+                "sample_types": sample_types,
+                "techniques": all_techniques,
+                "interactions": interactions,
+                "threat_level": threat_level,
+                "suggestions": suggestions
+            }
+        except Exception as e:
+            self.logger.error(f"Error in multi-malware scenario analysis: {str(e)}")
+            return {
+                "error": str(e),
+                "status": "failed"
+            }
+    
+    def _analyze_sample_interactions(self, samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Analyze interactions between malware samples."""
+        interactions = []
+        
+        if len(samples) < 2:
+            return interactions
+        
+        for i, sample1 in enumerate(samples):
+            for j, sample2 in enumerate(samples):
+                if i >= j:  # Skip self-interactions and duplicates
+                    continue
+                
+                sample1_name = sample1.get("name", f"Sample {i+1}")
+                sample2_name = sample2.get("name", f"Sample {j+1}")
+                
+                common_techniques = set(sample1.get("techniques", {}).keys()) & set(sample2.get("techniques", {}).keys())
+                
+                if common_techniques:
+                    interactions.append({
+                        "type": "common_techniques",
+                        "sample1": sample1_name,
+                        "sample2": sample2_name,
+                        "techniques": list(common_techniques)
+                    })
+                
+                if "T1071" in sample1.get("techniques", {}) and "T1071" in sample2.get("techniques", {}):
+                    interactions.append({
+                        "type": "command_and_control",
+                        "sample1": sample1_name,
+                        "sample2": sample2_name,
+                        "description": "Multiple samples using command and control channels"
+                    })
+                
+                if "T1048" in sample1.get("techniques", {}) and "T1048" in sample2.get("techniques", {}):
+                    interactions.append({
+                        "type": "data_exfiltration",
+                        "sample1": sample1_name,
+                        "sample2": sample2_name,
+                        "description": "Coordinated data exfiltration detected"
+                    })
+        
+        return interactions
+    
+    def _calculate_threat_level(self, samples: List[Dict[str, Any]], techniques: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate overall threat level for multi-malware scenario."""
+        base_score = min(0.5 + (len(samples) * 0.1) + (len(techniques) * 0.05), 0.9)
+        
+        high_impact_techniques = ["T1486", "T1055", "T1078", "T1190"]
+        for technique in high_impact_techniques:
+            if technique in techniques:
+                base_score = min(base_score + 0.1, 0.95)
+        
+        has_ransomware = any(sample.get("type") == "ransomware" for sample in samples)
+        if has_ransomware:
+            base_score = min(base_score + 0.1, 0.98)
+        
+        category = "Medium"
+        if base_score >= 0.8:
+            category = "Critical"
+        elif base_score >= 0.6:
+            category = "High"
+        
+        return {
+            "score": base_score,
+            "category": category,
+            "factors": {
+                "sample_count": len(samples),
+                "technique_count": len(techniques),
+                "has_ransomware": has_ransomware,
+                "high_impact_techniques": [t for t in high_impact_techniques if t in techniques]
+            }
+        }
+    
+    def _generate_multi_malware_suggestions(self, 
+                                          sample_types: List[str], 
+                                          techniques: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate security improvement suggestions for multi-malware scenarios."""
+        suggestions = []
+        
+        suggestions.append({
+            "title": "Implement defense-in-depth strategy",
+            "description": "Deploy multiple layers of security controls to protect against coordinated attacks.",
+            "priority": "critical"
+        })
+        
+        suggestions.append({
+            "title": "Enhance security monitoring",
+            "description": "Implement comprehensive security monitoring to detect multi-stage and multi-vector attacks.",
+            "priority": "critical"
+        })
+        
+        if "ransomware" in sample_types:
+            suggestions.append({
+                "title": "Implement immutable backups",
+                "description": "Use immutable backups that cannot be modified or deleted by ransomware.",
+                "priority": "critical"
+            })
+        
+        if "trojan" in sample_types or "backdoor" in sample_types:
+            suggestions.append({
+                "title": "Implement network segmentation",
+                "description": "Segment networks to prevent lateral movement and contain breaches.",
+                "priority": "high"
+            })
+        
+        if "botnet" in sample_types:
+            suggestions.append({
+                "title": "Implement network traffic analysis",
+                "description": "Deploy network traffic analysis tools to detect command and control communications.",
+                "priority": "high"
+            })
+        
+        if "T1071" in techniques:  # Command and Control
+            suggestions.append({
+                "title": "Implement DNS filtering and monitoring",
+                "description": "Use DNS filtering and monitoring to detect and block command and control communications.",
+                "priority": "high"
+            })
+        
+        if "T1486" in techniques:  # Data Encrypted for Impact
+            suggestions.append({
+                "title": "Implement file integrity monitoring",
+                "description": "Deploy file integrity monitoring to detect unauthorized file modifications.",
+                "priority": "high"
+            })
+        
+        if "T1055" in techniques:  # Process Injection
+            suggestions.append({
+                "title": "Deploy advanced endpoint protection",
+                "description": "Use advanced endpoint protection solutions that can detect process injection techniques.",
+                "priority": "high"
+            })
+        
+        if "T1547" in techniques:  # Boot or Logon Autostart Execution
+            suggestions.append({
+                "title": "Implement startup program monitoring",
+                "description": "Monitor and control programs that run at system startup.",
+                "priority": "medium"
+            })
+        
+        return suggestions
+        
     def _generate_suggestions(self, 
                              malware_type: str, 
                              ai_classification: Dict[str, Any], 

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enhanced Malware Knowledge Graph</title>
+    <meta charset="utf-8">
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style type="text/css">
+        #mynetwork {
+            width: 100%;
+            height: 800px;
+            border: 1px solid lightgray;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .legend {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .controls {
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 15px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .download-btn {
+            background-color: #2196F3;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        .description {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Malware Knowledge Graph</h1>
+    
+    <div class="description">
+        <p>This interactive knowledge graph visualizes the relationships between malware, attack techniques, and system components. The graph shows how malware interacts with the host system, including processes, network connections, registry modifications, and file operations.</p>
+        <p>Use the controls below to adjust the visualization. Hover over nodes for detailed information.</p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="network.fit()">Fit View</button>
+        <button onclick="togglePhysics()">Toggle Physics</button>
+        <button id="edgeLabelsBtn" onclick="toggleEdgeLabels()">Hide Edge Labels</button>
+        <button class="download-btn" onclick="downloadGraph()">Download Graph</button>
+    </div>
+    
+    <div id="mynetwork"></div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #00CC66;"></span>
+            <span>Host System</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #FF5733;"></span>
+            <span>Malware</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #3357FF;"></span>
+            <span>Attack Technique</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #FF33A8;"></span>
+            <span>Process</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #33FFFC;"></span>
+            <span>Network</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #FFFC33;"></span>
+            <span>Registry</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #FC9D33;"></span>
+            <span>File</span>
+        </div>
+    </div>
+    
+    <script type="text/javascript">
+        // Graph data
+        var nodes = new vis.DataSet(NODES_DATA);
+        var edges = new vis.DataSet(EDGES_DATA);
+        
+        // Debug check to ensure edges are properly loaded
+        console.log("Loaded edges:", edges.length);
+        
+        // Fix edge format if needed
+        edges.forEach(function(edge) {
+            // Ensure from/to properties exist (required by vis.js)
+            if (!edge.from && edge.source) {
+                edge.from = edge.source;
+            }
+            if (!edge.to && edge.target) {
+                edge.to = edge.target;
+            }
+        });
+        
+        // Initialize with edge labels visible
+        window.onload = function() {
+            // Ensure edge labels are visible by default
+            setTimeout(function() {
+                // Force edge labels to be visible
+                var edgeOptions = {
+                    font: {
+                        size: 12,
+                        align: 'middle',
+                        background: 'rgba(255, 255, 255, 0.7)'
+                    }
+                };
+                network.setOptions({ edges: edgeOptions });
+            }, 500);
+        };
+        
+        // Create a network
+        var container = document.getElementById('mynetwork');
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+        
+        // Debug the edges data
+        console.log("Edge data:", JSON.stringify(edges.get(), null, 2));
+        
+        var options = {
+            nodes: {
+                shape: 'dot',
+                font: {
+                    size: 14
+                }
+            },
+            edges: {
+                font: {
+                    size: 12,
+                    align: 'middle',
+                    background: 'rgba(255, 255, 255, 0.7)'
+                },
+                arrows: {
+                    to: {enabled: true, scaleFactor: 1}
+                },
+                smooth: {enabled: true, type: 'dynamic', roundness: 0.5},
+                color: {
+                    inherit: false,
+                    color: '#848484',
+                    highlight: '#00CC66'
+                },
+                width: 2,
+                selectionWidth: 3,
+                hoverWidth: 2,
+                hidden: false
+            },
+            physics: {
+                enabled: true,
+                stabilization: true,
+                barnesHut: {
+                    gravitationalConstant: -80000,
+                    springConstant: 0.001,
+                    springLength: 200
+                }
+            },
+            interaction: {
+                tooltipDelay: 200,
+                hideEdgesOnDrag: true,
+                hover: true,
+                navigationButtons: true,
+                keyboard: true
+            },
+            layout: {
+                improvedLayout: true,
+                hierarchical: {
+                    enabled: false
+                }
+            },
+            groups: {
+                host: {
+                    color: {background: '#00CC66', border: '#008800'},
+                    shape: 'diamond'
+                },
+                malware: {
+                    color: {background: '#FF5733', border: '#CC0000'},
+                    shape: 'dot'
+                },
+                technique: {
+                    color: {background: '#3357FF', border: '#0000CC'},
+                    shape: 'dot'
+                },
+                process: {
+                    color: {background: '#FF33A8', border: '#CC0088'},
+                    shape: 'square'
+                },
+                network: {
+                    color: {background: '#33FFFC', border: '#00CCCC'},
+                    shape: 'triangle'
+                },
+                registry: {
+                    color: {background: '#FFFC33', border: '#CCCC00'},
+                    shape: 'dot'
+                },
+                file: {
+                    color: {background: '#FC9D33', border: '#CC8800'},
+                    shape: 'dot'
+                }
+            }
+        };
+        var network = new vis.Network(container, data, options);
+        
+        // Toggle physics
+        function togglePhysics() {
+            options.physics.enabled = !options.physics.enabled;
+            network.setOptions(options);
+        }
+        
+        // Toggle edge labels
+        function toggleEdgeLabels() {
+            if (options.edges.font.size === 0) {
+                options.edges.font.size = 12;
+            } else {
+                options.edges.font.size = 0;
+            }
+            network.setOptions(options);
+        }
+        
+        // Download graph as JSON
+        function downloadGraph() {
+            const graphData = {
+                nodes: nodes.get(),
+                edges: edges.get()
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graphData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "malware_knowledge_graph_" + new Date().toISOString().slice(0,19).replace(/:/g,"-") + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+        
+        // Highlight connected nodes on click
+        network.on("click", function(params) {
+            if (params.nodes.length > 0) {
+                var nodeId = params.nodes[0];
+                var connectedNodes = network.getConnectedNodes(nodeId);
+                var allNodes = nodes.get({returnType: "Object"});
+                var allEdges = edges.get({returnType: "Object"});
+                
+                // Reset all nodes
+                for (var i in allNodes) {
+                    allNodes[i].color = undefined;
+                    allNodes[i].font = {size: 14};
+                }
+                
+                // Reset all edges
+                for (var i in allEdges) {
+                    allEdges[i].color = {color: '#848484', highlight: '#848484'};
+                    allEdges[i].width = 1;
+                }
+                
+                // Highlight selected node
+                allNodes[nodeId].font = {size: 18};
+                
+                // Highlight connected nodes and edges
+                for (var i = 0; i < connectedNodes.length; i++) {
+                    allNodes[connectedNodes[i]].font = {size: 16};
+                    var edgeId = nodeId + "_" + connectedNodes[i];
+                    var reverseEdgeId = connectedNodes[i] + "_" + nodeId;
+                    
+                    if (edgeId in allEdges) {
+                        allEdges[edgeId].color = {color: '#00CC66', highlight: '#00CC66'};
+                        allEdges[edgeId].width = 3;
+                    }
+                    if (reverseEdgeId in allEdges) {
+                        allEdges[reverseEdgeId].color = {color: '#00CC66', highlight: '#00CC66'};
+                        allEdges[reverseEdgeId].width = 3;
+                    }
+                }
+                
+                // Update the nodes and edges
+                nodes.update(Object.values(allNodes));
+                edges.update(Object.values(allEdges));
+            } else {
+                // Reset all nodes and edges
+                var allNodes = nodes.get({returnType: "Object"});
+                var allEdges = edges.get({returnType: "Object"});
+                
+                for (var i in allNodes) {
+                    allNodes[i].color = undefined;
+                    allNodes[i].font = {size: 14};
+                }
+                
+                for (var i in allEdges) {
+                    allEdges[i].color = undefined;
+                    allEdges[i].width = 1;
+                }
+                
+                nodes.update(Object.values(allNodes));
+                edges.update(Object.values(allEdges));
+            }
+        });
+    </script>
+</body>
+</html>

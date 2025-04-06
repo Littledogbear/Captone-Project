@@ -133,33 +133,64 @@ class AlertManager:
                 except Exception as e:
                     logger.error(f"Error in alert handler {handler_name}: {str(e)}")
     
-    def _console_alert_handler(self, alert: Dict[str, Any]):
+    def _console_alert_handler(self, alert):
         """
         Handle an alert by printing to console.
         
         Args:
-            alert: Alert dictionary
+            alert: Alert dictionary or object
         """
-        severity = alert.get("severity", "INFO")
-        timestamp = alert.get("timestamp", datetime.now().isoformat())
-        message = alert.get("message", "")
-        details = alert.get("details", {})
+        if isinstance(alert, dict):
+            severity = alert.get("severity", "INFO")
+            timestamp = alert.get("timestamp", datetime.now().isoformat())
+            message = alert.get("message", "")
+            details = alert.get("details", {})
+        else:
+            severity = getattr(alert, "severity", "INFO")
+            timestamp = getattr(alert, "timestamp", datetime.now().isoformat())
+            message = getattr(alert, "message", "")
+            details = getattr(alert, "details", {})
         
         console_format = self.config.get("console_format", "standard")
         if console_format == "standard":
             logger.warning(f"[{severity}] {timestamp} - {message}")
         else:
-            logger.warning(f"ALERT: {json.dumps(alert, indent=2)}")
+            if isinstance(alert, dict):
+                logger.warning(f"ALERT: {json.dumps(alert, indent=2)}")
+            else:
+                logger.warning(f"ALERT: {severity} - {message}")
     
-    def _file_alert_handler(self, alert: Dict[str, Any]):
+    def _file_alert_handler(self, alert):
         """
         Handle an alert by writing to a file.
         
         Args:
-            alert: Alert dictionary
+            alert: Alert dictionary or object
         """
         try:
-            timestamp = datetime.fromisoformat(alert.get("timestamp", datetime.now().isoformat()))
+            if isinstance(alert, dict):
+                timestamp_str = alert.get("timestamp", datetime.now().isoformat())
+                alert_dict = alert
+            else:
+                timestamp_str = getattr(alert, "timestamp", datetime.now().isoformat())
+                
+                severity = getattr(alert, "severity", "INFO")
+                if hasattr(severity, "name"):
+                    severity = severity.name
+                
+                alert_type = getattr(alert, "type", "")
+                if hasattr(alert_type, "name"):
+                    alert_type = alert_type.name
+                
+                alert_dict = {
+                    "timestamp": timestamp_str,
+                    "severity": severity,
+                    "type": alert_type,
+                    "message": getattr(alert, "message", ""),
+                    "details": getattr(alert, "details", {})
+                }
+            
+            timestamp = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else datetime.now()
             date_str = timestamp.strftime("%Y%m%d")
             alert_file = self.alert_dir / f"alerts_{date_str}.json"
             
@@ -169,15 +200,23 @@ class AlertManager:
                     json.dump([], f)
             
             # Read existing alerts
-            with open(alert_file, "r") as f:
-                alerts = json.load(f)
+            try:
+                with open(alert_file, "r") as f:
+                    alerts = json.load(f)
+            except json.JSONDecodeError:
+                alerts = []
+            
+            if "details" in alert_dict and isinstance(alert_dict["details"], dict):
+                for key, value in alert_dict["details"].items():
+                    if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                        alert_dict["details"][key] = str(value)
             
             # Add new alert
-            alerts.append(alert)
+            alerts.append(alert_dict)
             
             # Write back to file
             with open(alert_file, "w") as f:
-                json.dump(alerts, f, indent=2)
+                json.dump(alerts, f, indent=2, default=str)
         except Exception as e:
             logger.error(f"Error writing alert to file: {str(e)}")
     
@@ -518,7 +557,7 @@ class AlertManager:
         # Sort by timestamp (newest first)
         filtered_alerts = sorted(
             filtered_alerts,
-            key=lambda x: x.get("timestamp", ""),
+            key=lambda x: x.timestamp if hasattr(x, "timestamp") else (x.get("timestamp", "") if isinstance(x, dict) else ""),
             reverse=True
         )
         

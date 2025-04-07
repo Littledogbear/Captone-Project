@@ -1,0 +1,35 @@
+
+enabled: true
+host: "127.0.0.1"
+port: 8081
+
+monitoring:
+  interval: 5
+  adaptive: true
+  min_interval: 1
+  max_interval: 60
+
+alerts:
+  max_alerts: 1000
+  retention_period: 24
+  min_severity: "INFO"
+
+ui:
+  theme: "light"
+  refresh_interval: 5
+  default_tab: "system"
+  show_system_metrics: true
+  show_alert_history: true
+  show_knowledge_graphs: true
+  show_reports: true
+
+knowledge_graph:
+  auto_generate: true
+  generation_interval: 15
+  max_graphs: 20
+
+reports:
+  auto_generate: true
+  generation_interval: 30
+  max_reports: 10
+  format: "html"

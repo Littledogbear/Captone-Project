@@ -16,10 +16,13 @@ import time
 import logging
 import argparse
 import threading
-from pathlib import Path
+import webbrowser
+import subprocess
 import json
 import random
+from pathlib import Path
 from datetime import datetime
+import requests
 
 logging.basicConfig(
     level=logging.INFO,
@@ -366,6 +369,99 @@ def main():
         logger.info("Stopping test...")
         dashboard.stop()
         logger.info("Test stopped")
+
+def generate_security_improvements(attack_techniques):
+    """Generate security improvement suggestions based on attack techniques."""
+    improvements = {
+        "high_priority": [],
+        "medium_priority": [],
+        "low_priority": []
+    }
+    
+    technique_improvements = {
+        "T1547.001": {
+            "priority": "high",
+            "suggestion": "Implement AppLocker or Software Restriction Policies to prevent unauthorized executables from running.",
+            "details": "Configure Windows to prevent unauthorized modifications to startup registry keys."
+        },
+        "T1059.001": {
+            "priority": "high",
+            "suggestion": "Enable PowerShell script block logging and constrained language mode.",
+            "details": "Monitor for suspicious PowerShell commands and implement AMSI for script scanning."
+        },
+        "T1486": {
+            "priority": "high",
+            "suggestion": "Implement regular backups with offline storage and test restoration procedures.",
+            "details": "Use application control to prevent unauthorized encryption tools from executing."
+        },
+        "T1498": {
+            "priority": "medium",
+            "suggestion": "Implement DoS protection services and traffic filtering.",
+            "details": "Configure network monitoring to detect unusual traffic patterns and implement rate limiting."
+        }
+    }
+    
+    for technique in attack_techniques:
+        technique_id = technique.get("id")
+        if technique_id in technique_improvements:
+            improvement = technique_improvements[technique_id]
+            priority = improvement["priority"]
+            
+            if priority == "high":
+                improvements["high_priority"].append({
+                    "technique_id": technique_id,
+                    "suggestion": improvement["suggestion"],
+                    "details": improvement["details"]
+                })
+            elif priority == "medium":
+                improvements["medium_priority"].append({
+                    "technique_id": technique_id,
+                    "suggestion": improvement["suggestion"],
+                    "details": improvement["details"]
+                })
+            else:
+                improvements["low_priority"].append({
+                    "technique_id": technique_id,
+                    "suggestion": improvement["suggestion"],
+                    "details": improvement["details"]
+                })
+    
+    return improvements
+
+def test_dashboard_ui():
+    """Test the dashboard UI by accessing it and checking for key elements."""
+    try:
+        response = requests.get(f"http://127.0.0.1:8081")
+        if response.status_code == 200:
+            content = response.text
+            
+            ui_elements = [
+                "Cyber Attack Tracer - Real-time Monitoring Dashboard",
+                "System Monitoring",
+                "Alerts",
+                "Knowledge Graph",
+                "Reports",
+                "Generate Knowledge Graph",
+                "Generate Report"
+            ]
+            
+            missing_elements = []
+            for element in ui_elements:
+                if element not in content:
+                    missing_elements.append(element)
+            
+            if missing_elements:
+                logger.error(f"Missing UI elements: {', '.join(missing_elements)}")
+                return False
+            else:
+                logger.info("All UI elements present in the dashboard")
+                return True
+        else:
+            logger.error(f"Failed to access dashboard: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"Error testing dashboard UI: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     main()

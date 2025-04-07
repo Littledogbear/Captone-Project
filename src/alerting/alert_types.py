@@ -77,6 +77,7 @@ class Alert:
                 description: str,
                 timestamp: str,
                 source: str,
+                message: str = "",
                 data: Dict[str, Any] = None):
         """
         Initialize an Alert.
@@ -88,12 +89,14 @@ class Alert:
             description: Detailed description
             timestamp: ISO format timestamp
             source: Source of the alert (e.g., "real_time_monitor")
+            message: Short message for display in console/logs
             data: Additional data related to the alert
         """
-        self.alert_type = alert_type
+        self.type = alert_type
         self.severity = severity
         self.title = title
         self.description = description
+        self.message = message or description
         self.timestamp = timestamp
         self.source = source
         self.data = data or {}
@@ -101,13 +104,18 @@ class Alert:
         self.resolved = False
         self.resolution_notes = ""
         
+    def __str__(self):
+        """String representation of the alert."""
+        return f"{self.severity.name} - {self.message}"
+        
     def to_dict(self) -> Dict[str, Any]:
         """Convert Alert to dictionary."""
         return {
-            "alert_type": self.alert_type.to_string(),
+            "alert_type": self.type.to_string(),
             "severity": self.severity.to_string(),
             "title": self.title,
             "description": self.description,
+            "message": self.message,
             "timestamp": self.timestamp,
             "source": self.source,
             "data": self.data,

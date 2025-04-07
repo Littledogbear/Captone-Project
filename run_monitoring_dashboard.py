@@ -44,6 +44,10 @@ def main():
                        help='Directory containing malware samples metadata')
     args = parser.parse_args()
     
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("output/dashboard_graphs", exist_ok=True)
+    os.makedirs("output/dashboard_reports", exist_ok=True)
+    
     logger.info("Initializing dashboard components...")
     
     dashboard = AlertDashboard(host=args.host, port=args.port)

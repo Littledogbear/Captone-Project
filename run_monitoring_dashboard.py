@@ -71,7 +71,7 @@ def main():
     dashboard.register_knowledge_graph_builder(graph_builder, ui_integrator)
     
     logger.info(f"Starting dashboard on http://{args.host}:{args.port}")
-    dashboard.start()
+    dashboard.start(dashboard_title="Cyber Attack Tracer - Real-time Monitoring Dashboard")
     
     monitor_thread = threading.Thread(target=monitor.start_monitoring)
     monitor_thread.daemon = True

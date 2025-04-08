@@ -8,14 +8,13 @@ import logging
 import json
 import time
 import threading
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -154,7 +153,6 @@ if not dashboard_template.exists():
                 width: 100%;
                 display: flex;
                 justify-content: space-between;
-                z-index: 1000;
             }
             .status-indicator {
                 display: inline-block;
@@ -174,64 +172,6 @@ if not dashboard_template.exists():
                 padding: 50px;
                 color: #666;
             }
-            .tabs {
-                display: flex;
-                border-bottom: 1px solid #ddd;
-                margin-bottom: 20px;
-            }
-            .tab {
-                padding: 10px 20px;
-                cursor: pointer;
-                border: 1px solid transparent;
-                border-bottom: none;
-                margin-right: 5px;
-                border-radius: 3px 3px 0 0;
-                background-color: #f0f0f0;
-            }
-            .tab.active {
-                border-color: #ddd;
-                background-color: white;
-                margin-bottom: -1px;
-            }
-            .tab-content {
-                display: none;
-            }
-            .tab-content.active {
-                display: block;
-            }
-            .action-buttons {
-                margin: 20px 0;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-            .action-button {
-                padding: 10px 15px;
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-            }
-            .action-button:hover {
-                background-color: #45a049;
-            }
-            .action-button img {
-                margin-right: 8px;
-                width: 20px;
-                height: 20px;
-            }
-            .visualization-container {
-                margin-top: 20px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 20px;
-                min-height: 400px;
-                background-color: white;
-            }
             @media (max-width: 768px) {
                 .container {
                     padding: 10px;
@@ -250,62 +190,18 @@ if not dashboard_template.exists():
             <h1>Cyber Attack Tracer - Alert Dashboard</h1>
         </div>
         <div class="container">
-            <div class="tabs">
-                <div class="tab active" data-tab="alerts">Alerts</div>
-                <div class="tab" data-tab="knowledge-graph">Knowledge Graph</div>
-                <div class="tab" data-tab="reports">Security Reports</div>
-                <div class="tab" data-tab="system-monitoring">System Monitoring</div>
+            <div class="filters">
+                <button class="filter active" data-severity="all">All</button>
+                <button class="filter" data-severity="CRITICAL">Critical</button>
+                <button class="filter" data-severity="HIGH">High</button>
+                <button class="filter" data-severity="MEDIUM">Medium</button>
+                <button class="filter" data-severity="LOW">Low</button>
+                <button class="filter" data-severity="INFO">Info</button>
             </div>
-            
-            <div id="alerts" class="tab-content active">
-                <h2>Alert Management</h2>
-                <div class="filters">
-                    <button class="filter active" data-severity="all">All</button>
-                    <button class="filter" data-severity="CRITICAL">Critical</button>
-                    <button class="filter" data-severity="HIGH">High</button>
-                    <button class="filter" data-severity="MEDIUM">Medium</button>
-                    <button class="filter" data-severity="LOW">Low</button>
-                    <button class="filter" data-severity="INFO">Info</button>
-                </div>
-                <div class="alert-container" id="alertContainer">
-                    <div class="no-alerts" id="noAlerts">
-                        <h2>No alerts to display</h2>
-                        <p>Waiting for new alerts...</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="knowledge-graph" class="tab-content">
-                <h2>Knowledge Graph Visualization</h2>
-                <div class="action-buttons">
-                    <button id="generate-graph" class="action-button">
-                        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIxOHB4IiBoZWlnaHQ9IjE4cHgiPjxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMTQgM3YyaDMuNTlsLTkuODMgOS44My0xLjQxLTEuNDFMNi4xNyAxM2gtNHYyaDZ6TTUgM2gtMnYySDN2NGgyVjVoNFYzSDV6bTE2IDE0aC02djJoNHYtNGgydjRoMnYtNmgtMnYyeiIvPjwvc3ZnPg==" alt="Generate">
-                        Generate Knowledge Graph
-                    </button>
-                </div>
-                <div id="graph-visualization" class="visualization-container">
-                    <p>Click the button above to generate a knowledge graph.</p>
-                </div>
-            </div>
-            
-            <div id="reports" class="tab-content">
-                <h2>Security Reports</h2>
-                <div class="action-buttons">
-                    <button id="generate-report" class="action-button">
-                        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiIHdpZHRoPSIxOHB4IiBoZWlnaHQ9IjE4cHgiPjxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMTkgM0g1Yy0xLjEgMC0yIC45LTIgMnYxNGMwIDEuMS45IDIgMiAyaDE0YzEuMSAwIDItLjkgMi0yVjVjMC0xLjEtLjktMi0yLTJ6bTAgMTZINVY1aDE0djE0ek0xNyA4SDdWN2gxMHYxem0wIDNIN3YtMWgxMHYxem0wIDNIN3YtMWgxMHYxeiIvPjwvc3ZnPg==" alt="Report">
-                        Generate Security Report
-                    </button>
-                </div>
-                <div id="report-content" class="visualization-container">
-                    <p>Click the button above to generate a security report.</p>
-                </div>
-            </div>
-            
-            <div id="system-monitoring" class="tab-content">
-                <h2>System Monitoring</h2>
-                <div id="system-resources">
-                    <h3>System Resources</h3>
-                    <div id="resource-charts">Loading system resources...</div>
+            <div class="alert-container" id="alertContainer">
+                <div class="no-alerts" id="noAlerts">
+                    <h2>No alerts to display</h2>
+                    <p>Waiting for new alerts...</p>
                 </div>
             </div>
         </div>
@@ -345,8 +241,6 @@ if not dashboard_template.exists():
                     } else if (data.type === 'alerts') {
                         alerts = data.alerts;
                         renderAlerts();
-                    } else if (data.type === 'system_resources') {
-                        updateSystemResources(data.resources);
                     }
                 };
                 
@@ -427,16 +321,6 @@ if not dashboard_template.exists():
                     container.appendChild(alertElement);
                 });
             }
-            
-            // Update system resources
-            function updateSystemResources(resources) {
-                const resourceCharts = document.getElementById('resource-charts');
-                resourceCharts.innerHTML = `
-                    <div>CPU Usage: ${resources.cpu_percent}%</div>
-                    <div>Memory Usage: ${resources.memory_percent}%</div>
-                    <div>Disk I/O: Read ${resources.disk_io.read_bytes} bytes, Write ${resources.disk_io.write_bytes} bytes</div>
-                `;
-            }
 
             // Initialize filters
             document.querySelectorAll('.filter').forEach(filter => {
@@ -453,70 +337,6 @@ if not dashboard_template.exists():
                     // Render alerts with new filter
                     renderAlerts();
                 });
-            });
-            
-            // Tab functionality
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // Update active tab
-                    document.querySelectorAll('.tab').forEach(t => {
-                        t.classList.remove('active');
-                    });
-                    tab.classList.add('active');
-                    
-                    // Update active content
-                    const tabId = tab.dataset.tab;
-                    document.querySelectorAll('.tab-content').forEach(content => {
-                        content.classList.remove('active');
-                    });
-                    document.getElementById(tabId).classList.add('active');
-                });
-            });
-            
-            // Handle generate knowledge graph button
-            document.getElementById('generate-graph').addEventListener('click', () => {
-                const graphVisualization = document.getElementById('graph-visualization');
-                graphVisualization.innerHTML = '<p>Generating knowledge graph...</p>';
-                
-                fetch('/api/generate-knowledge-graph')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            graphVisualization.innerHTML = `
-                                <iframe src="${data.graph_url}" width="100%" height="600" frameborder="0"></iframe>
-                            `;
-                        } else {
-                            graphVisualization.innerHTML = `<p>Error generating knowledge graph: ${data.error}</p>`;
-                        }
-                    })
-                    .catch(error => {
-                        graphVisualization.innerHTML = `<p>Error: ${error.message}</p>`;
-                    });
-            });
-            
-            // Handle generate report button
-            document.getElementById('generate-report').addEventListener('click', () => {
-                const reportContent = document.getElementById('report-content');
-                reportContent.innerHTML = '<p>Generating security report...</p>';
-                
-                fetch('/api/generate-report')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            reportContent.innerHTML = `
-                                <iframe src="${data.report_url}" width="100%" height="600" frameborder="0"></iframe>
-                                <a href="${data.report_url}" download="security_report.html" 
-                                   style="display: block; margin-top: 10px; text-align: center;">
-                                   Download Report
-                                </a>
-                            `;
-                        } else {
-                            reportContent.innerHTML = `<p>Error generating report: ${data.error}</p>`;
-                        }
-                    })
-                    .catch(error => {
-                        reportContent.innerHTML = `<p>Error: ${error.message}</p>`;
-                    });
             });
 
             // Connect to WebSocket
@@ -559,19 +379,15 @@ class AlertDashboard:
     4. Managing alert lifecycle (acknowledge, resolve, etc.)
     """
     
-    def __init__(self, host=None, port=None):
+    def __init__(self):
         """Initialize the AlertDashboard."""
         self.config = load_config().get("alert_dashboard", {})
-        self.enabled = self.config.get("enabled", True)
-        self.host = host or self.config.get("host", "127.0.0.1")
-        self.port = port or self.config.get("port", 8080)
+        self.enabled = self.config.get("enabled", False)
+        self.host = self.config.get("host", "127.0.0.1")
+        self.port = self.config.get("port", 8080)
         self.server = None
         self.server_thread = None
         self.running = False
-        self.report_generator = None
-        self.knowledge_graph_builder = None
-        self.ui_integrator = None
-        self.dashboard_title = "Cyber Attack Tracer - Alert Dashboard"
     
     def start(self):
         """Start the dashboard server."""
@@ -605,32 +421,6 @@ class AlertDashboard:
         except Exception as e:
             logger.error(f"Error running alert dashboard server: {str(e)}")
     
-    def register_report_generator(self, report_generator):
-        """Register a report generator for use with the dashboard."""
-        self.report_generator = report_generator
-        logger.info("Report generator registered with dashboard")
-        
-    def register_knowledge_graph_builder(self, graph_builder, ui_integrator=None):
-        """Register a knowledge graph builder for use with the dashboard."""
-        self.knowledge_graph_builder = graph_builder
-        self.ui_integrator = ui_integrator
-        logger.info("Knowledge graph builder registered with dashboard")
-        
-    def _convert_alerts_to_traces(self):
-        """Convert alerts to traces for knowledge graph generation."""
-        traces = []
-        return traces
-        
-    def _convert_alerts_to_analysis_data(self):
-        """Convert alerts to analysis data for report generation."""
-        analysis_data = {
-            "processes": [],
-            "network_connections": [],
-            "techniques": [],
-            "malware_samples": []
-        }
-        return analysis_data
-    
     def send_alert(self, alert: Dict[str, Any]):
         """
         Send an alert to all connected clients.
@@ -658,109 +448,6 @@ dashboard = AlertDashboard()
 async def get_dashboard():
     """Get the dashboard HTML."""
     return templates.TemplateResponse("dashboard.html", {"request": {}})
-
-@app.get("/api/generate-knowledge-graph")
-async def generate_knowledge_graph():
-    """Generate a knowledge graph visualization."""
-    if not dashboard.knowledge_graph_builder:
-        return JSONResponse(content={
-            "success": False,
-            "error": "Knowledge graph builder not registered with dashboard"
-        })
-        
-    try:
-        traces = dashboard._convert_alerts_to_traces()
-        
-        graph = dashboard.knowledge_graph_builder.build_graph_from_traces(traces)
-        
-        if dashboard.ui_integrator:
-            timestamp = int(datetime.now().timestamp())
-            result = dashboard.ui_integrator.create_dashboard(
-                graph=graph,
-                filename=f"knowledge_graph_{timestamp}.html",
-                title="Cyber Attack Knowledge Graph"
-            )
-            
-            if "main_graph" in result:
-                graph_path = result.get("main_graph", "")
-                graph_filename = os.path.basename(graph_path)
-                graph_url = f"/visualizations/{graph_filename}"
-                
-                vis_dir = Path(static_dir) / "visualizations"
-                vis_dir.mkdir(exist_ok=True)
-                
-                target_path = Path(vis_dir) / graph_filename
-                if not target_path.exists():
-                    os.symlink(graph_path, target_path)
-                
-                return JSONResponse(content={
-                    "success": True,
-                    "graph_url": graph_url
-                })
-            else:
-                return JSONResponse(content={
-                    "success": False,
-                    "error": "Failed to create visualization"
-                })
-        else:
-            return JSONResponse(content={
-                "success": True,
-                "nodes": len(graph.nodes()),
-                "edges": len(graph.edges()),
-                "message": "Graph generated, but UI integrator not available for visualization"
-            })
-    except Exception as e:
-        logger.error(f"Error generating knowledge graph: {str(e)}")
-        return JSONResponse(content={
-            "success": False,
-            "error": str(e)
-        })
-
-@app.get("/api/generate-report")
-async def generate_report():
-    """Generate a security report."""
-    if not dashboard.report_generator:
-        return JSONResponse(content={
-            "success": False,
-            "error": "Report generator not registered with dashboard"
-        })
-        
-    try:
-        analysis_data = dashboard._convert_alerts_to_analysis_data()
-        
-        report_html = dashboard.report_generator.generate_report(analysis_data, report_type="html")
-        
-        timestamp = int(datetime.now().timestamp())
-        reports_dir = Path(static_dir) / "reports"
-        reports_dir.mkdir(exist_ok=True)
-        
-        report_filename = f"security_report_{timestamp}.html"
-        report_path = reports_dir / report_filename
-        
-        with open(report_path, "w") as f:
-            f.write(report_html)
-        
-        report_url = f"/static/reports/{report_filename}"
-        
-        return JSONResponse(content={
-            "success": True,
-            "report_url": report_url
-        })
-    except Exception as e:
-        logger.error(f"Error generating report: {str(e)}")
-        return JSONResponse(content={
-            "success": False,
-            "error": str(e)
-        })
-
-@app.get("/visualizations/{filename}")
-async def get_visualization(filename: str):
-    """Serve visualization files."""
-    vis_dir = Path(static_dir) / "visualizations"
-    file_path = vis_dir / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Visualization not found")
-    return FileResponse(file_path)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
